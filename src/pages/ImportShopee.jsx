@@ -30,6 +30,7 @@ export default function ImportShopee({ onBack }) {
   const [aliases, setAliases] = useState({}) // shopee_name -> sku_id
   const [parsedOrders, setParsedOrders] = useState(null) // [{orderNo, date, shopeeName, qty, matchedSkuId}]
   const [parsedIncome, setParsedIncome] = useState(null) // [{orderNo, settledOn, grossPrice, actualAmount}]
+  const [existingOrderNos, setExistingOrderNos] = useState(new Set())
   const [fileError, setFileError] = useState('')
   const [committing, setCommitting] = useState(false)
   const [result, setResult] = useState(null)
@@ -104,7 +105,7 @@ export default function ImportShopee({ onBack }) {
     setResult(null)
 
     const reader = new FileReader()
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
         const wb = XLSX.read(ev.target.result, { type: 'array' })
         const sheet = wb.Sheets['Income']
@@ -129,6 +130,16 @@ export default function ImportShopee({ onBack }) {
           })
         }
         setParsedIncome(items)
+
+        // เช็คกับฐานข้อมูลว่า order_no ไหนเคยลงไปแล้ว เพื่อบอกผู้ใช้ก่อนบันทึก
+        const orderNos = items.map((i) => i.orderNo)
+        if (orderNos.length > 0) {
+          const { data: existing } = await supabase
+            .from('payouts')
+            .select('order_no')
+            .in('order_no', orderNos)
+          setExistingOrderNos(new Set((existing || []).map((e) => e.order_no)))
+        }
       } catch (err) {
         setFileError('อ่านไฟล์ไม่สำเร็จ: ' + err.message)
       }
@@ -202,12 +213,20 @@ export default function ImportShopee({ onBack }) {
       return
     }
 
-    const { error } = await supabase.from('payouts').insert(payoutRows)
+    const newCount = parsedIncome.filter((it) => !existingOrderNos.has(it.orderNo)).length
+    const updateCount = parsedIncome.length - newCount
+
+    // upsert ตาม order_no — ถ้าเคยลงแล้วจะอัปเดตทับด้วยค่าล่าสุด ไม่สร้างแถวซ้ำ
+    const { error } = await supabase
+      .from('payouts')
+      .upsert(payoutRows, { onConflict: 'order_no' })
+
     if (error) {
       setFileError('บันทึกไม่สำเร็จ: ' + error.message)
     } else {
-      setResult({ type: 'income', count: payoutRows.length })
+      setResult({ type: 'income', count: parsedIncome.length, newCount, updateCount })
       setParsedIncome(null)
+      setExistingOrderNos(new Set())
     }
     setCommitting(false)
   }
@@ -285,7 +304,18 @@ export default function ImportShopee({ onBack }) {
 
         {result && (
           <div className="bg-teal-500/10 border border-teal-500/30 text-teal-400 text-sm p-3 rounded-lg">
-            บันทึก{result.type === 'orders' ? 'รายการขายออก' : 'ยอดเงินเข้า'}สำเร็จ {result.count} รายการ
+            {result.type === 'orders' ? (
+              <>บันทึกรายการขายออกสำเร็จ {result.count} รายการ</>
+            ) : (
+              <>
+                บันทึกยอดเงินเข้าสำเร็จ {result.count} รายการ
+                {result.updateCount > 0 && (
+                  <span className="block text-xs mt-1">
+                    (ใหม่ {result.newCount} · อัปเดตทับของเดิม {result.updateCount})
+                  </span>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -328,17 +358,30 @@ export default function ImportShopee({ onBack }) {
         {/* Preview: Income */}
         {mode === 'income' && parsedIncome && (
           <div className="space-y-3">
-            <div className="bg-slate-800 rounded-xl p-3 border border-slate-700">
+            <div className="bg-slate-800 rounded-xl p-3 border border-slate-700 space-y-1">
               <p className="text-sm">พบ {parsedIncome.length} รายการ รวม {parsedIncome.reduce((s, r) => s + r.actualAmount, 0).toLocaleString('th-TH')} บาท</p>
+              {existingOrderNos.size > 0 ? (
+                <p className="text-xs text-yellow-400">
+                  ในนี้มี {existingOrderNos.size} รายการที่เคยลงไปแล้ว — จะถูกอัปเดตทับด้วยค่าล่าสุด ไม่สร้างแถวซ้ำ
+                </p>
+              ) : (
+                <p className="text-xs text-teal-400">ทั้งหมดเป็นรายการใหม่ ยังไม่เคยลงในระบบ</p>
+              )}
             </div>
 
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {parsedIncome.slice(0, 20).map((it, idx) => (
-                <div key={idx} className="bg-slate-800 rounded-lg p-3 border border-slate-700 flex items-center justify-between">
-                  <p className="text-xs text-slate-400">{it.orderNo} · {it.settledOn}</p>
-                  <p className="text-sm text-teal-400 font-medium">{it.actualAmount.toLocaleString('th-TH')} บ.</p>
-                </div>
-              ))}
+              {parsedIncome.slice(0, 20).map((it, idx) => {
+                const isDup = existingOrderNos.has(it.orderNo)
+                return (
+                  <div key={idx} className={`rounded-lg p-3 border flex items-center justify-between ${isDup ? 'bg-yellow-500/5 border-yellow-500/30' : 'bg-slate-800 border-slate-700'}`}>
+                    <div>
+                      <p className="text-xs text-slate-400">{it.orderNo} · {it.settledOn}</p>
+                      {isDup && <p className="text-xs text-yellow-400 mt-0.5">เคยลงแล้ว — จะอัปเดตทับ</p>}
+                    </div>
+                    <p className="text-sm text-teal-400 font-medium">{it.actualAmount.toLocaleString('th-TH')} บ.</p>
+                  </div>
+                )
+              })}
               {parsedIncome.length > 20 && (
                 <p className="text-xs text-slate-500 text-center">และอีก {parsedIncome.length - 20} รายการ</p>
               )}
@@ -349,7 +392,7 @@ export default function ImportShopee({ onBack }) {
               disabled={committing}
               className="w-full py-2.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-medium text-sm transition disabled:opacity-50"
             >
-              {committing ? 'กำลังบันทึก...' : `บันทึก ${parsedIncome.length} รายการเป็นยอดเงินเข้า`}
+              {committing ? 'กำลังบันทึก...' : `บันทึก ${parsedIncome.length} รายการ`}
             </button>
           </div>
         )}
