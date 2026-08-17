@@ -4,10 +4,11 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import DataEntry from './pages/DataEntry'
 import Monitoring from './pages/Monitoring'
+import PricingCalculator from './pages/PricingCalculator'
 
 function AppContent() {
   const { session, loading } = useAuth()
-  const [view, setView] = useState('dashboard') // dashboard | dataEntry | monitoring
+  const [view, setView] = useState('dashboard') // dashboard | dataEntry | monitoring | pricing
 
   if (loading) {
     return (
@@ -27,10 +28,15 @@ function AppContent() {
     return <Monitoring onBack={() => setView('dashboard')} />
   }
 
+  if (view === 'pricing') {
+    return <PricingCalculator onBack={() => setView('dashboard')} />
+  }
+
   return (
     <Dashboard
       onNavigateDataEntry={() => setView('dataEntry')}
       onNavigateMonitoring={() => setView('monitoring')}
+      onNavigatePricing={() => setView('pricing')}
     />
   )
 }
