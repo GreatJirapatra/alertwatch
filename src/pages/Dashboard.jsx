@@ -25,7 +25,7 @@ function FreshBadge({ status }) {
   return <span className={`text-xs px-2 py-1 rounded-full ${styles[status] || ''}`}>{status}</span>
 }
 
-export default function Dashboard({ onNavigateDataEntry }) {
+export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring }) {
   const { user, signOut } = useAuth()
   const [stock, setStock] = useState([])
   const [stores, setStores] = useState([])
@@ -61,7 +61,13 @@ export default function Dashboard({ onNavigateDataEntry }) {
           <h1 className="text-lg font-bold">AlertWatch</h1>
           <p className="text-xs text-slate-500">{user?.email}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onNavigateMonitoring}
+            className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition"
+          >
+            Monitoring
+          </button>
           <button
             onClick={onNavigateDataEntry}
             className="text-xs px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-medium transition"

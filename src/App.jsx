@@ -3,10 +3,11 @@ import { AuthProvider, useAuth } from './lib/AuthContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import DataEntry from './pages/DataEntry'
+import Monitoring from './pages/Monitoring'
 
 function AppContent() {
   const { session, loading } = useAuth()
-  const [view, setView] = useState('dashboard') // dashboard | dataEntry
+  const [view, setView] = useState('dashboard') // dashboard | dataEntry | monitoring
 
   if (loading) {
     return (
@@ -22,7 +23,16 @@ function AppContent() {
     return <DataEntry onBack={() => setView('dashboard')} />
   }
 
-  return <Dashboard onNavigateDataEntry={() => setView('dataEntry')} />
+  if (view === 'monitoring') {
+    return <Monitoring onBack={() => setView('dashboard')} />
+  }
+
+  return (
+    <Dashboard
+      onNavigateDataEntry={() => setView('dataEntry')}
+      onNavigateMonitoring={() => setView('monitoring')}
+    />
+  )
 }
 
 export default function App() {
