@@ -168,13 +168,22 @@ export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, o
             {pl.length > 0 && (
               <section>
                 <h2 className="text-sm font-semibold text-slate-300 mb-2">กำไรสุทธิรายเดือน (3 เดือนล่าสุด)</h2>
+                <p className="text-xs text-slate-500 mb-2">นับกำไรตามเดือนที่เงินเข้าจริง จับคู่กับต้นทุนของออเดอร์เดียวกัน</p>
                 <div className="bg-slate-800 rounded-lg border border-slate-700 divide-y divide-slate-700">
                   {pl.map((m) => (
-                    <div key={m.month} className="p-3 flex items-center justify-between">
-                      <p className="text-sm">{new Date(m.month).toLocaleDateString('th-TH', { year: 'numeric', month: 'long' })}</p>
-                      <p className={`text-sm font-medium ${m.net_profit >= 0 ? 'text-teal-400' : 'text-red-400'}`}>
-                        {m.net_profit?.toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท
-                      </p>
+                    <div key={m.month} className="p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm">{new Date(m.month).toLocaleDateString('th-TH', { year: 'numeric', month: 'long' })}</p>
+                        <p className={`text-sm font-medium ${m.net_profit >= 0 ? 'text-teal-400' : 'text-red-400'}`}>
+                          {m.net_profit?.toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท
+                        </p>
+                      </div>
+                      {(m.unmatched_cogs > 0 || m.unmatched_received > 0) && (
+                        <p className="text-xs text-yellow-400/80 mt-1">
+                          ⚠ ยังไม่รวม: ต้นทุนที่ยังไม่รู้ผล {(m.unmatched_cogs || 0).toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท
+                          {m.unmatched_received > 0 && ` · เงินเข้าที่ยังไม่ผูกออเดอร์ ${m.unmatched_received.toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท`}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>

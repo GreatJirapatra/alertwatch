@@ -117,6 +117,8 @@ export default function Monitoring({ onBack }) {
         ค่าโฆษณา: r.ads,
         กำไรสุทธิ: r.net_profit,
         มาร์จิ้นสุทธิ: r.net_margin != null ? (r.net_margin * 100).toFixed(2) + '%' : '',
+        ต้นทุนที่ยังไม่รู้ผล_ยังไม่มีpayoutคู่กัน: r.unmatched_cogs || 0,
+        เงินเข้าที่ยังไม่ผูกออเดอร์: r.unmatched_received || 0,
       })))
     }
     setExportBusy('')
