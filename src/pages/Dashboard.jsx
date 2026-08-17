@@ -17,9 +17,9 @@ function StatusBadge({ action }) {
 
 function FreshBadge({ status }) {
   const styles = {
-    'สด': 'bg-teal-500/20 text-teal-400',
+    'อัปเดตล่าสุด': 'bg-teal-500/20 text-teal-400',
     'ควรอัปเดต': 'bg-yellow-500/20 text-yellow-400',
-    'ข้อมูลเก่ามาก': 'bg-red-500/20 text-red-400',
+    'ไม่อัปเดตนานมาก': 'bg-red-500/20 text-red-400',
     'ยังไม่มีข้อมูล': 'bg-slate-600/30 text-slate-500',
   }
   return <span className={`text-xs px-2 py-1 rounded-full ${styles[status] || ''}`}>{status}</span>
@@ -52,7 +52,7 @@ export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring })
   }, [])
 
   const needReorder = stock.filter((s) => s.action === 'สั่งเพิ่ม')
-  const staleStores = stores.filter((s) => s.status === 'ข้อมูลเก่ามาก' || s.status === 'ควรอัปเดต')
+  const staleStores = stores.filter((s) => s.status === 'ไม่อัปเดตนานมาก' || s.status === 'ควรอัปเดต')
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
@@ -99,7 +99,7 @@ export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring })
                 <p className="text-xs text-slate-500">SKU</p>
               </div>
               <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                <p className="text-xs text-slate-400">ร้านข้อมูลไม่สด</p>
+                <p className="text-xs text-slate-400">ร้านยังไม่อัปเดตล่าสุด</p>
                 <p className="text-2xl font-bold text-yellow-400 mt-1">{staleStores.length}</p>
                 <p className="text-xs text-slate-500">ร้าน</p>
               </div>
@@ -141,9 +141,9 @@ export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring })
               </div>
             </section>
 
-            {/* ความสดของข้อมูลร้าน */}
+            {/* สถานะการอัปเดตข้อมูลร้าน */}
             <section>
-              <h2 className="text-sm font-semibold text-slate-300 mb-2">ความสดของข้อมูลร้าน (12 ร้าน)</h2>
+              <h2 className="text-sm font-semibold text-slate-300 mb-2">สถานะการอัปเดตข้อมูลร้าน (12 ร้าน)</h2>
               <div className="bg-slate-800 rounded-lg border border-slate-700 divide-y divide-slate-700">
                 {stores.map((s) => (
                   <div key={s.id} className="p-3 flex items-center justify-between">
