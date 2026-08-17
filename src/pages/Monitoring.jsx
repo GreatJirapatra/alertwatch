@@ -4,6 +4,7 @@ import {
   PieChart, Pie, Legend,
 } from 'recharts'
 import { supabase } from '../lib/supabase'
+import { exportToCsv, todayStamp } from '../lib/csvExport'
 
 // เขียวเหลือเยอะ / เหลืองใกล้ต้องสั่ง / แดงต้องสั่งแล้วหรือหมด
 function stockColor(row) {
@@ -43,6 +44,7 @@ export default function Monitoring({ onBack }) {
   const [storeSales, setStoreSales] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [exportBusy, setExportBusy] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -82,6 +84,70 @@ export default function Monitoring({ onBack }) {
     load()
   }, [])
 
+  async function exportStockStatus() {
+    setExportBusy('stock')
+    const { data, error } = await supabase.from('stock_status').select('*').order('code')
+    if (error) {
+      alert('ดึงข้อมูลไม่สำเร็จ: ' + error.message)
+    } else {
+      exportToCsv(`สต็อกคงเหลือ_${todayStamp()}.csv`, (data || []).map((r) => ({
+        รหัสสินค้า: r.code,
+        ชื่อสินค้า: r.name,
+        คงเหลือ: r.on_hand,
+        ขายเฉลี่ยต่อวัน: r.per_day,
+        คุ้มครองกี่วัน: r.days_cover,
+        จุดสั่งซื้อ: r.reorder_point,
+        สถานะ: r.action,
+      })))
+    }
+    setExportBusy('')
+  }
+
+  async function exportMonthlyPl() {
+    setExportBusy('pl')
+    const { data, error } = await supabase.from('monthly_pl').select('*').order('month', { ascending: false })
+    if (error) {
+      alert('ดึงข้อมูลไม่สำเร็จ: ' + error.message)
+    } else {
+      exportToCsv(`สรุปกำไรขาดทุนรายเดือน_${todayStamp()}.csv`, (data || []).map((r) => ({
+        เดือน: new Date(r.month).toLocaleDateString('th-TH', { year: 'numeric', month: 'long' }),
+        จำนวนชิ้นที่ขาย: r.units,
+        เงินเข้าจริง: r.received,
+        ต้นทุนขาย: r.cogs,
+        ค่าโฆษณา: r.ads,
+        กำไรสุทธิ: r.net_profit,
+        มาร์จิ้นสุทธิ: r.net_margin != null ? (r.net_margin * 100).toFixed(2) + '%' : '',
+      })))
+    }
+    setExportBusy('')
+  }
+
+  async function exportMovements() {
+    setExportBusy('movements')
+    const { data, error } = await supabase
+      .from('movements')
+      .select('moved_on, kind, qty, order_no, note, unit_cost, created_by, skus(code, name), stores(name)')
+      .order('moved_on', { ascending: false })
+
+    if (error) {
+      alert('ดึงข้อมูลไม่สำเร็จ: ' + error.message)
+    } else {
+      const kindLabel = { in: 'รับเข้า', out: 'ขายออก', return: 'ตีกลับ', adjust: 'ปรับปรุงยอด' }
+      exportToCsv(`รายการเคลื่อนไหวสต๊อก_${todayStamp()}.csv`, (data || []).map((r) => ({
+        วันที่: r.moved_on,
+        ประเภท: kindLabel[r.kind] || r.kind,
+        รหัสสินค้า: r.skus?.code || '',
+        ชื่อสินค้า: r.skus?.name || '',
+        ร้าน: r.stores?.name || 'คลังกลาง',
+        จำนวน: r.qty,
+        ต้นทุนต่อชิ้น: r.unit_cost,
+        เลขที่ออเดอร์: r.order_no || '',
+        หมายเหตุ: r.note || '',
+      })))
+    }
+    setExportBusy('')
+  }
+
   const pieData = stock.map((s) => ({ name: s.code, value: s.on_hand }))
 
   return (
@@ -99,6 +165,34 @@ export default function Monitoring({ onBack }) {
             โหลดข้อมูลไม่สำเร็จ: {error}
           </div>
         )}
+
+        <section className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+          <h2 className="text-sm font-semibold text-slate-200 mb-1">Export ข้อมูล (CSV)</h2>
+          <p className="text-xs text-slate-500 mb-3">เปิดได้ทั้งใน Excel และ Google Sheets</p>
+          <div className="grid grid-cols-1 gap-2">
+            <button
+              onClick={exportStockStatus}
+              disabled={exportBusy !== ''}
+              className="text-sm py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition disabled:opacity-50 text-left px-3"
+            >
+              {exportBusy === 'stock' ? 'กำลังเตรียมไฟล์...' : '📦 สต็อกคงเหลือปัจจุบัน'}
+            </button>
+            <button
+              onClick={exportMonthlyPl}
+              disabled={exportBusy !== ''}
+              className="text-sm py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition disabled:opacity-50 text-left px-3"
+            >
+              {exportBusy === 'pl' ? 'กำลังเตรียมไฟล์...' : '📊 สรุปกำไรขาดทุนรายเดือน'}
+            </button>
+            <button
+              onClick={exportMovements}
+              disabled={exportBusy !== ''}
+              className="text-sm py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition disabled:opacity-50 text-left px-3"
+            >
+              {exportBusy === 'movements' ? 'กำลังเตรียมไฟล์...' : '📋 รายการเคลื่อนไหวสต๊อกทั้งหมด'}
+            </button>
+          </div>
+        </section>
 
         {loading ? (
           <p className="text-slate-500 text-sm">กำลังโหลด...</p>
