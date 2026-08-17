@@ -1,0 +1,167 @@
+import { useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/AuthContext'
+
+function StatusBadge({ action }) {
+  const styles = {
+    'สั่งเพิ่ม': 'bg-red-500/20 text-red-400 border-red-500/40',
+    'ปกติ': 'bg-teal-500/20 text-teal-400 border-teal-500/40',
+    'ไม่เคลื่อนไหว': 'bg-slate-500/20 text-slate-400 border-slate-500/40',
+  }
+  return (
+    <span className={`text-xs px-2 py-1 rounded-full border ${styles[action] || styles['ปกติ']}`}>
+      {action}
+    </span>
+  )
+}
+
+function FreshBadge({ status }) {
+  const styles = {
+    'สด': 'bg-teal-500/20 text-teal-400',
+    'ควรอัปเดต': 'bg-yellow-500/20 text-yellow-400',
+    'ข้อมูลเก่ามาก': 'bg-red-500/20 text-red-400',
+    'ยังไม่มีข้อมูล': 'bg-slate-600/30 text-slate-500',
+  }
+  return <span className={`text-xs px-2 py-1 rounded-full ${styles[status] || ''}`}>{status}</span>
+}
+
+export default function Dashboard() {
+  const { user, signOut } = useAuth()
+  const [stock, setStock] = useState([])
+  const [stores, setStores] = useState([])
+  const [pl, setPl] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      const [stockRes, storesRes, plRes] = await Promise.all([
+        supabase.from('stock_status').select('*').order('code'),
+        supabase.from('store_freshness').select('*').order('kind').order('name'),
+        supabase.from('monthly_pl').select('*').limit(3),
+      ])
+
+      if (stockRes.error) setError(stockRes.error.message)
+      setStock(stockRes.data || [])
+      setStores(storesRes.data || [])
+      setPl(plRes.data || [])
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  const needReorder = stock.filter((s) => s.action === 'สั่งเพิ่ม')
+  const staleStores = stores.filter((s) => s.status === 'ข้อมูลเก่ามาก' || s.status === 'ควรอัปเดต')
+
+  return (
+    <div className="min-h-screen bg-slate-900 text-slate-100">
+      <header className="border-b border-slate-800 px-4 py-4 flex items-center justify-between sticky top-0 bg-slate-900/95 backdrop-blur z-10">
+        <div>
+          <h1 className="text-lg font-bold">AlertWatch</h1>
+          <p className="text-xs text-slate-500">{user?.email}</p>
+        </div>
+        <button onClick={signOut} className="text-xs text-slate-400 hover:text-red-400 transition">
+          ออกจากระบบ
+        </button>
+      </header>
+
+      <main className="p-4 space-y-6 max-w-3xl mx-auto">
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm p-3 rounded-lg">
+            โหลดข้อมูลไม่สำเร็จ: {error}
+          </div>
+        )}
+
+        {loading ? (
+          <p className="text-slate-500 text-sm">กำลังโหลด...</p>
+        ) : (
+          <>
+            {/* สรุปด่วน */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <p className="text-xs text-slate-400">ต้องสั่งเพิ่ม</p>
+                <p className="text-2xl font-bold text-red-400 mt-1">{needReorder.length}</p>
+                <p className="text-xs text-slate-500">SKU</p>
+              </div>
+              <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <p className="text-xs text-slate-400">ร้านข้อมูลไม่สด</p>
+                <p className="text-2xl font-bold text-yellow-400 mt-1">{staleStores.length}</p>
+                <p className="text-xs text-slate-500">ร้าน</p>
+              </div>
+            </div>
+
+            {/* สต๊อกต้องสั่งเพิ่ม */}
+            <section>
+              <h2 className="text-sm font-semibold text-slate-300 mb-2">สต๊อกที่ต้องสั่งเพิ่ม</h2>
+              {needReorder.length === 0 ? (
+                <p className="text-slate-500 text-sm bg-slate-800/50 rounded-lg p-3">ไม่มีรายการที่ต้องสั่งเพิ่มตอนนี้</p>
+              ) : (
+                <div className="space-y-2">
+                  {needReorder.map((s) => (
+                    <div key={s.id} className="bg-slate-800 rounded-lg p-3 border border-slate-700 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">{s.name}</p>
+                        <p className="text-xs text-slate-500">{s.code} · เหลือ {s.on_hand} ชิ้น · คุ้มครอง {s.days_cover ?? '-'} วัน</p>
+                      </div>
+                      <StatusBadge action={s.action} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* สถานะสต๊อกทั้งหมด */}
+            <section>
+              <h2 className="text-sm font-semibold text-slate-300 mb-2">สถานะสต๊อกทั้งหมด</h2>
+              <div className="bg-slate-800 rounded-lg border border-slate-700 divide-y divide-slate-700">
+                {stock.map((s) => (
+                  <div key={s.id} className="p-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm">{s.name}</p>
+                      <p className="text-xs text-slate-500">เหลือ {s.on_hand} · ขาย {s.per_day}/วัน</p>
+                    </div>
+                    <StatusBadge action={s.action} />
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* ความสดของข้อมูลร้าน */}
+            <section>
+              <h2 className="text-sm font-semibold text-slate-300 mb-2">ความสดของข้อมูลร้าน (12 ร้าน)</h2>
+              <div className="bg-slate-800 rounded-lg border border-slate-700 divide-y divide-slate-700">
+                {stores.map((s) => (
+                  <div key={s.id} className="p-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm">{s.name}</p>
+                      <p className="text-xs text-slate-500">{s.kind === 'own' ? 'ร้านตัวเอง' : 'ร้านเพื่อน'} · เช็คทุก {s.review_days} วัน</p>
+                    </div>
+                    <FreshBadge status={s.status} />
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* กำไรขาดทุนรายเดือน */}
+            {pl.length > 0 && (
+              <section>
+                <h2 className="text-sm font-semibold text-slate-300 mb-2">กำไรสุทธิรายเดือน (3 เดือนล่าสุด)</h2>
+                <div className="bg-slate-800 rounded-lg border border-slate-700 divide-y divide-slate-700">
+                  {pl.map((m) => (
+                    <div key={m.month} className="p-3 flex items-center justify-between">
+                      <p className="text-sm">{new Date(m.month).toLocaleDateString('th-TH', { year: 'numeric', month: 'long' })}</p>
+                      <p className={`text-sm font-medium ${m.net_profit >= 0 ? 'text-teal-400' : 'text-red-400'}`}>
+                        {m.net_profit?.toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
+        )}
+      </main>
+    </div>
+  )
+}
