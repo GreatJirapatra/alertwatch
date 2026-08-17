@@ -23,7 +23,7 @@ function excelDateToIso(val) {
 
 export default function ImportShopee({ onBack }) {
   const { user } = useAuth()
-  const [mode, setMode] = useState('orders') // orders | income
+  const [mode, setMode] = useState('income') // orders | income
   const [stores, setStores] = useState([])
   const [storeId, setStoreId] = useState('')
   const [skus, setSkus] = useState([])
@@ -220,7 +220,7 @@ export default function ImportShopee({ onBack }) {
         <button onClick={onBack} className="text-slate-400 hover:text-teal-400 transition text-sm">
           ← กลับ
         </button>
-        <h1 className="text-lg font-bold">นำเข้าไฟล์ Shopee</h1>
+        <h1 className="text-lg font-bold">นำเข้ายอดเงิน Shopee</h1>
       </header>
 
       <main className="p-4 space-y-4 max-w-md mx-auto">

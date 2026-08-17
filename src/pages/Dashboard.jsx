@@ -83,7 +83,7 @@ export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, o
           onClick={onNavigateImport}
           className="text-xs py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium transition"
         >
-          นำเข้าไฟล์ Shopee
+          นำเข้ายอดเงิน Shopee
         </button>
         <button
           onClick={onNavigateDataEntry}
