@@ -25,7 +25,7 @@ function FreshBadge({ status }) {
   return <span className={`text-xs px-2 py-1 rounded-full ${styles[status] || ''}`}>{status}</span>
 }
 
-export default function Dashboard() {
+export default function Dashboard({ onNavigateDataEntry }) {
   const { user, signOut } = useAuth()
   const [stock, setStock] = useState([])
   const [stores, setStores] = useState([])
@@ -61,9 +61,17 @@ export default function Dashboard() {
           <h1 className="text-lg font-bold">AlertWatch</h1>
           <p className="text-xs text-slate-500">{user?.email}</p>
         </div>
-        <button onClick={signOut} className="text-xs text-slate-400 hover:text-red-400 transition">
-          ออกจากระบบ
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onNavigateDataEntry}
+            className="text-xs px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-medium transition"
+          >
+            คีย์ข้อมูล
+          </button>
+          <button onClick={signOut} className="text-xs text-slate-400 hover:text-red-400 transition">
+            ออกจากระบบ
+          </button>
+        </div>
       </header>
 
       <main className="p-4 space-y-6 max-w-3xl mx-auto">

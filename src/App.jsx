@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import DataEntry from './pages/DataEntry'
 
 function AppContent() {
   const { session, loading } = useAuth()
+  const [view, setView] = useState('dashboard') // dashboard | dataEntry
 
   if (loading) {
     return (
@@ -13,7 +16,13 @@ function AppContent() {
     )
   }
 
-  return session ? <Dashboard /> : <Login />
+  if (!session) return <Login />
+
+  if (view === 'dataEntry') {
+    return <DataEntry onBack={() => setView('dashboard')} />
+  }
+
+  return <Dashboard onNavigateDataEntry={() => setView('dataEntry')} />
 }
 
 export default function App() {
