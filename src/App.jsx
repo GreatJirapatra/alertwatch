@@ -5,10 +5,11 @@ import Dashboard from './pages/Dashboard'
 import DataEntry from './pages/DataEntry'
 import Monitoring from './pages/Monitoring'
 import PricingCalculator from './pages/PricingCalculator'
+import ImportShopee from './pages/ImportShopee'
 
 function AppContent() {
   const { session, loading } = useAuth()
-  const [view, setView] = useState('dashboard') // dashboard | dataEntry | monitoring | pricing
+  const [view, setView] = useState('dashboard') // dashboard | dataEntry | monitoring | pricing | import
 
   if (loading) {
     return (
@@ -32,11 +33,16 @@ function AppContent() {
     return <PricingCalculator onBack={() => setView('dashboard')} />
   }
 
+  if (view === 'import') {
+    return <ImportShopee onBack={() => setView('dashboard')} />
+  }
+
   return (
     <Dashboard
       onNavigateDataEntry={() => setView('dataEntry')}
       onNavigateMonitoring={() => setView('monitoring')}
       onNavigatePricing={() => setView('pricing')}
+      onNavigateImport={() => setView('import')}
     />
   )
 }

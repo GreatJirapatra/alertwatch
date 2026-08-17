@@ -25,7 +25,7 @@ function FreshBadge({ status }) {
   return <span className={`text-xs px-2 py-1 rounded-full ${styles[status] || ''}`}>{status}</span>
 }
 
-export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, onNavigatePricing }) {
+export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, onNavigatePricing, onNavigateImport }) {
   const { user, signOut } = useAuth()
   const [stock, setStock] = useState([])
   const [stores, setStores] = useState([])
@@ -66,22 +66,28 @@ export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, o
         </button>
       </header>
 
-      <nav className="px-4 py-3 flex gap-2 max-w-3xl mx-auto border-b border-slate-800/60">
+      <nav className="px-4 py-3 grid grid-cols-2 gap-2 max-w-3xl mx-auto border-b border-slate-800/60">
         <button
           onClick={onNavigateMonitoring}
-          className="flex-1 text-xs py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium transition"
+          className="text-xs py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium transition"
         >
           Monitoring
         </button>
         <button
           onClick={onNavigatePricing}
-          className="flex-1 text-xs py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium transition"
+          className="text-xs py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium transition"
         >
           ตั้งราคาขาย
         </button>
         <button
+          onClick={onNavigateImport}
+          className="text-xs py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium transition"
+        >
+          นำเข้าไฟล์ Shopee
+        </button>
+        <button
           onClick={onNavigateDataEntry}
-          className="flex-1 text-xs py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-medium transition"
+          className="text-xs py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-medium transition"
         >
           คีย์ข้อมูล
         </button>
