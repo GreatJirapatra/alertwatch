@@ -42,7 +42,9 @@ export default function Monitoring({ onBack }) {
   const [stock, setStock] = useState([])
   const [pl, setPl] = useState([])
   const [storeSales, setStoreSales] = useState([])
+  const [salesRange, setSalesRange] = useState('30') // '7' | '30' | 'all'
   const [loading, setLoading] = useState(true)
+  const [salesLoading, setSalesLoading] = useState(false)
   const [error, setError] = useState('')
   const [exportBusy, setExportBusy] = useState('')
 
@@ -50,11 +52,9 @@ export default function Monitoring({ onBack }) {
     async function load() {
       setLoading(true)
 
-      const [stockRes, plRes, storesRes, movementsRes] = await Promise.all([
+      const [stockRes, plRes] = await Promise.all([
         supabase.from('stock_status').select('*').order('code'),
         supabase.from('monthly_pl').select('*').order('month', { ascending: true }).limit(6),
-        supabase.from('stores').select('id, name, kind').eq('active', true),
-        supabase.from('movements').select('store_id, qty, kind, unit_cost, moved_on').eq('kind', 'out'),
       ])
 
       if (stockRes.error) setError(stockRes.error.message)
@@ -65,8 +65,25 @@ export default function Monitoring({ onBack }) {
         monthLabel: new Date(m.month).toLocaleDateString('th-TH', { month: 'short', year: '2-digit' }),
       })))
 
-      // รวมยอดขาย (บาท) ต่อร้าน จาก movements kind=out (qty ติดลบ * unit_cost คือ COGS ไม่ใช่ยอดขาย
-      // แต่เราไม่มีราคาขายผูกกับ movement โดยตรง ใช้จำนวนชิ้นขายแทนเป็นตัวเปรียบเทียบ)
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  useEffect(() => {
+    async function loadStoreSales() {
+      setSalesLoading(true)
+
+      const storesRes = await supabase.from('stores').select('id, name, kind').eq('active', true)
+
+      let query = supabase.from('movements').select('store_id, qty, moved_on').eq('kind', 'out')
+      if (salesRange !== 'all') {
+        const days = Number(salesRange)
+        const fromDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+        query = query.gte('moved_on', fromDate)
+      }
+      const movementsRes = await query
+
       const storeMap = new Map((storesRes.data || []).map((s) => [s.id, s.name]))
       const unitsByStore = {}
       for (const m of movementsRes.data || []) {
@@ -78,11 +95,10 @@ export default function Monitoring({ onBack }) {
         .map(([name, units]) => ({ name, units }))
         .sort((a, b) => b.units - a.units)
       setStoreSales(storeArr)
-
-      setLoading(false)
+      setSalesLoading(false)
     }
-    load()
-  }, [])
+    loadStoreSales()
+  }, [salesRange])
 
   async function exportStockStatus() {
     setExportBusy('stock')
@@ -327,25 +343,50 @@ export default function Monitoring({ onBack }) {
             </ChartCard>
 
             {/* 4. เปรียบเทียบยอดขายรายร้าน */}
-            <ChartCard
-              title="ยอดขายรายร้าน (จำนวนชิ้น)"
-              subtitle="รวมยอดขายทุก SKU ต่อร้าน — เทียบสัดส่วนการเคลื่อนไหว"
-              height={Math.max(200, storeSales.length * 40)}
-            >
-              {storeSales.length === 0 ? (
-                <p className="text-slate-500 text-sm">ยังไม่มีข้อมูลยอดขายผูกกับร้าน</p>
-              ) : (
-                <ResponsiveContainer>
-                  <BarChart data={storeSales} layout="vertical" margin={{ left: 8, right: 16 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-                    <XAxis type="number" stroke="#64748b" fontSize={11} />
-                    <YAxis type="category" dataKey="name" stroke="#94a3b8" fontSize={11} width={90} />
-                    <Tooltip contentStyle={tooltipStyle()} formatter={(value) => [`${value} ชิ้น`, 'ขายแล้ว']} />
-                    <Bar dataKey="units" fill="#38bdf8" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </ChartCard>
+            <section className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="text-sm font-semibold text-slate-200">ยอดขายรายร้าน (จำนวนชิ้น)</h2>
+                <div className="flex gap-1">
+                  {[
+                    { key: '7', label: '7 วัน' },
+                    { key: '30', label: '30 วัน' },
+                    { key: 'all', label: 'ทั้งหมด' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.key}
+                      onClick={() => setSalesRange(opt.key)}
+                      className={`text-[11px] px-2 py-1 rounded-md transition ${
+                        salesRange === opt.key
+                          ? 'bg-teal-600 text-white'
+                          : 'bg-slate-700 text-slate-400'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 mb-2">
+                เทียบว่าร้านไหน performance ดีในช่วงที่เลือก — ใช้ดูแนวโน้มการออกของสินค้าต่อร้าน
+              </p>
+              <div style={{ width: '100%', height: Math.max(200, storeSales.length * 40) }}>
+                {salesLoading ? (
+                  <p className="text-slate-500 text-sm">กำลังโหลด...</p>
+                ) : storeSales.length === 0 ? (
+                  <p className="text-slate-500 text-sm">ไม่มีข้อมูลยอดขายผูกกับร้านในช่วงนี้</p>
+                ) : (
+                  <ResponsiveContainer>
+                    <BarChart data={storeSales} layout="vertical" margin={{ left: 8, right: 16 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
+                      <XAxis type="number" stroke="#64748b" fontSize={11} />
+                      <YAxis type="category" dataKey="name" stroke="#94a3b8" fontSize={11} width={90} />
+                      <Tooltip contentStyle={tooltipStyle()} formatter={(value) => [`${value} ชิ้น`, 'ขายแล้ว']} />
+                      <Bar dataKey="units" fill="#38bdf8" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </section>
           </>
         )}
       </main>

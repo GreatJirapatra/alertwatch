@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 
@@ -30,25 +30,67 @@ export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, o
   const [stock, setStock] = useState([])
   const [stores, setStores] = useState([])
   const [pl, setPl] = useState([])
+  const [todayByStore, setTodayByStore] = useState([]) // ยอดขายวันนี้แยกร้าน
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [liveFlash, setLiveFlash] = useState(false) // กระพริบบอกว่าเพิ่งอัปเดตสด
+  const flashTimer = useRef(null)
+
+  async function loadAll() {
+    const [stockRes, storesRes, plRes, todayRes] = await Promise.all([
+      supabase.from('stock_status').select('*').order('code'),
+      supabase.from('store_freshness').select('*').order('kind').order('name'),
+      supabase.from('monthly_pl').select('*').limit(3),
+      supabase
+        .from('movements')
+        .select('qty, kind, store_id, stores(name, kind)')
+        .eq('kind', 'out')
+        .gte('moved_on', new Date().toISOString().slice(0, 10)),
+    ])
+
+    if (stockRes.error) setError(stockRes.error.message)
+    setStock(stockRes.data || [])
+    setStores(storesRes.data || [])
+    setPl(plRes.data || [])
+
+    // รวมยอดขายวันนี้ (จำนวนชิ้น) แยกตามร้าน
+    const byStore = {}
+    for (const m of todayRes.data || []) {
+      const name = m.stores?.name || 'คลังกลาง (ไม่ระบุร้าน)'
+      const kind = m.stores?.kind
+      if (!byStore[name]) byStore[name] = { name, kind, units: 0 }
+      byStore[name].units += Math.abs(m.qty)
+    }
+    const arr = Object.values(byStore).sort((a, b) => b.units - a.units)
+    setTodayByStore(arr)
+
+    setLoading(false)
+  }
 
   useEffect(() => {
-    async function load() {
-      setLoading(true)
-      const [stockRes, storesRes, plRes] = await Promise.all([
-        supabase.from('stock_status').select('*').order('code'),
-        supabase.from('store_freshness').select('*').order('kind').order('name'),
-        supabase.from('monthly_pl').select('*').limit(3),
-      ])
+    setLoading(true)
+    loadAll()
 
-      if (stockRes.error) setError(stockRes.error.message)
-      setStock(stockRes.data || [])
-      setStores(storesRes.data || [])
-      setPl(plRes.data || [])
-      setLoading(false)
+    // subscribe realtime บนตาราง movements — พอมีใครคีย์ข้อมูลใหม่ (ไม่ว่าจากเครื่องไหน)
+    // จะโหลดข้อมูลทั้งหมดใหม่อัตโนมัติทันที ไม่ต้อง refresh เอง
+    const channel = supabase
+      .channel('movements-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'movements' },
+        () => {
+          loadAll()
+          setLiveFlash(true)
+          clearTimeout(flashTimer.current)
+          flashTimer.current = setTimeout(() => setLiveFlash(false), 1500)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearTimeout(flashTimer.current)
     }
-    load()
   }, [])
 
   const needReorder = stock.filter((s) => s.action === 'สั่งเพิ่ม')
@@ -58,7 +100,13 @@ export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, o
     <div className="min-h-screen bg-slate-900 text-slate-100">
       <header className="border-b border-slate-800 px-4 py-4 flex items-center justify-between sticky top-0 bg-slate-900/95 backdrop-blur z-10">
         <div>
-          <h1 className="text-lg font-bold">AlertWatch</h1>
+          <h1 className="text-lg font-bold flex items-center gap-2">
+            AlertWatch
+            <span
+              className={`w-2 h-2 rounded-full transition-colors ${liveFlash ? 'bg-teal-400' : 'bg-teal-600/40'}`}
+              title="เชื่อมต่อแบบสด"
+            />
+          </h1>
           <p className="text-xs text-slate-500">{user?.email}</p>
         </div>
         <button onClick={signOut} className="text-xs text-slate-400 hover:text-red-400 transition">
@@ -117,6 +165,35 @@ export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, o
                 <p className="text-xs text-slate-500">ร้าน</p>
               </div>
             </div>
+
+            {/* ยอดขายวันนี้แยกร้าน — อัปเดตสดทันทีที่มีคนคีย์ */}
+            <section>
+              <div className="flex items-center gap-2 mb-2">
+                <h2 className="text-sm font-semibold text-slate-300">ยอดขายวันนี้แยกร้าน</h2>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-400 font-medium">LIVE</span>
+              </div>
+              {todayByStore.length === 0 ? (
+                <p className="text-slate-500 text-sm bg-slate-800/50 rounded-lg p-3">ยังไม่มีการขายออกวันนี้</p>
+              ) : (
+                <div className="bg-slate-800 rounded-lg border border-slate-700 divide-y divide-slate-700">
+                  {todayByStore.map((s) => {
+                    const maxUnits = todayByStore[0]?.units || 1
+                    const pct = Math.round((s.units / maxUnits) * 100)
+                    return (
+                      <div key={s.name} className="p-3">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-sm">{s.name}</p>
+                          <p className="text-sm font-semibold text-teal-400">{s.units} ชิ้น</p>
+                        </div>
+                        <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                          <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
 
             {/* สต๊อกต้องสั่งเพิ่ม */}
             <section>
