@@ -13,6 +13,7 @@ export default function PricingCalculator({ onBack }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState(null)
+  const [stockInfo, setStockInfo] = useState(null) // ข้อมูลอัตราหมุนของ SKU ที่กำลังเลือก
 
   // ค่าที่ปรับได้ในเครื่องคำนวณ
   const [landedCost, setLandedCost] = useState('')
@@ -30,7 +31,7 @@ export default function PricingCalculator({ onBack }) {
       .then(({ data }) => { setSkus(data || []); setLoading(false) })
   }, [])
 
-  function loadSku(id) {
+  async function loadSku(id) {
     setSkuId(id)
     const s = skus.find((x) => x.id === id)
     if (!s) return
@@ -45,6 +46,10 @@ export default function PricingCalculator({ onBack }) {
     setMinMargin((s.min_margin * 100).toFixed(1))
     setCompetitorPrice(s.competitor_price ?? '')
     setCurrentPrice(s.current_price ?? '')
+
+    // ดึงอัตราการหมุนสต๊อกของ SKU นี้มาแสดงคู่กับการตั้งราคา
+    const { data: stock } = await supabase.from('stock_status').select('*').eq('id', id).single()
+    setStockInfo(stock || null)
   }
 
   // --- คำนวณ ---
@@ -135,6 +140,34 @@ export default function PricingCalculator({ onBack }) {
               placeholder="ไม่เลือก / กรอกเอง"
               options={skus.map((s) => ({ value: s.id, label: `${s.code} — ${s.name}` }))}
             />
+
+            {stockInfo && (
+              <div className={`rounded-xl p-4 border space-y-1 ${
+                stockInfo.days_cover == null || stockInfo.days_cover > 90
+                  ? 'bg-red-500/10 border-red-500/30'
+                  : stockInfo.days_cover > 30
+                  ? 'bg-yellow-500/10 border-yellow-500/30'
+                  : 'bg-teal-500/10 border-teal-500/30'
+              }`}>
+                <h3 className="text-sm font-semibold text-slate-200">อัตราการหมุนสต๊อกของ SKU นี้</h3>
+                <p className="text-xs text-slate-400">
+                  คงเหลือ {stockInfo.on_hand} ชิ้น · ขายเฉลี่ย {stockInfo.per_day} ชิ้น/วัน
+                </p>
+                <p className="text-sm">
+                  {stockInfo.days_cover == null
+                    ? 'ไม่มีการขายออกใน 90 วันที่ผ่านมา — เป็น dead stock'
+                    : `สต๊อกจะอยู่ได้อีกประมาณ ${stockInfo.days_cover} วัน ในอัตราขายปัจจุบัน`}
+                </p>
+                <p className="text-sm font-medium">
+                  เงินจมอยู่ในสต๊อกตัวนี้: ฿{Number(stockInfo.capital_value).toLocaleString('th-TH')}
+                </p>
+                {(stockInfo.days_cover == null || stockInfo.days_cover > 90) && (
+                  <p className="text-xs text-red-400 mt-1">
+                    ⚠ หมุนช้ามาก — พิจารณาลดราคาระบายสต๊อก หรือ cutoff SKU นี้แทนการตั้งราคาปกติ
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 space-y-3">
               <h3 className="text-sm font-semibold text-slate-200">ต้นทุนและค่าธรรมเนียม</h3>

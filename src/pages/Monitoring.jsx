@@ -96,6 +96,7 @@ export default function Monitoring({ onBack }) {
         คงเหลือ: r.on_hand,
         ขายเฉลี่ยต่อวัน: r.per_day,
         คุ้มครองกี่วัน: r.days_cover,
+        เงินจมในสต๊อกนี้: r.capital_value,
         จุดสั่งซื้อ: r.reorder_point,
         สถานะ: r.action,
       })))
@@ -196,6 +197,24 @@ export default function Monitoring({ onBack }) {
           </div>
         </section>
 
+        {stock.length > 0 && (() => {
+          const totalCapital = stock.reduce((s, r) => s + Number(r.capital_value || 0), 0)
+          const deadStock = stock.filter((r) => r.days_cover == null || r.days_cover > 90)
+          const deadCapital = deadStock.reduce((s, r) => s + Number(r.capital_value || 0), 0)
+          return (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <p className="text-xs text-slate-400">เงินจมในสต๊อกทั้งหมด</p>
+                <p className="text-xl font-bold mt-1">฿{totalCapital.toLocaleString('th-TH', { maximumFractionDigits: 0 })}</p>
+              </div>
+              <div className="bg-red-500/10 rounded-xl p-4 border border-red-500/30">
+                <p className="text-xs text-red-400">เงินจมใน dead stock ({'>'}90 วัน)</p>
+                <p className="text-xl font-bold text-red-400 mt-1">฿{deadCapital.toLocaleString('th-TH', { maximumFractionDigits: 0 })}</p>
+              </div>
+            </div>
+          )
+        })()}
+
         {loading ? (
           <p className="text-slate-500 text-sm">กำลังโหลด...</p>
         ) : (
@@ -218,6 +237,41 @@ export default function Monitoring({ onBack }) {
                   <Bar dataKey="on_hand" radius={[0, 4, 4, 0]}>
                     {stock.map((row) => (
                       <Cell key={row.id} fill={stockColor(row)} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+
+            {/* 1.5 อัตราการหมุนสต๊อก — เทียบว่า SKU ไหนออกเร็ว/ช้า พร้อมเงินที่จมอยู่ */}
+            <ChartCard
+              title="อัตราการหมุนสต๊อก (วันที่สต๊อกอยู่ได้)"
+              subtitle="ยิ่งแท่งยาว = ยิ่งออกช้า = เงินจมนาน · เรียงจากช้าสุดไปเร็วสุด"
+              height={Math.max(220, stock.length * 46)}
+            >
+              <ResponsiveContainer>
+                <BarChart
+                  data={[...stock].sort((a, b) => (b.days_cover ?? 999999) - (a.days_cover ?? 999999))}
+                  layout="vertical"
+                  margin={{ left: 8, right: 16 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
+                  <XAxis type="number" stroke="#64748b" fontSize={11} />
+                  <YAxis type="category" dataKey="code" stroke="#94a3b8" fontSize={11} width={90} />
+                  <Tooltip
+                    contentStyle={tooltipStyle()}
+                    formatter={(value, _name, props) => [
+                      value == null ? 'ไม่เคลื่อนไหวเลย' : `${value} วัน`,
+                      `${props.payload.name} · เงินจม ${Number(props.payload.capital_value).toLocaleString('th-TH')} บาท`,
+                    ]}
+                  />
+                  <Bar dataKey="days_cover" radius={[0, 4, 4, 0]}>
+                    {stock.map((row) => (
+                      <Cell key={row.id} fill={
+                        row.days_cover == null || row.days_cover > 90 ? '#ef4444' // แดง หมุนช้ามาก/dead stock
+                        : row.days_cover > 30 ? '#f59e0b' // เหลือง ปานกลาง
+                        : '#14b8a6' // เขียว หมุนเร็ว
+                      } />
                     ))}
                   </Bar>
                 </BarChart>
