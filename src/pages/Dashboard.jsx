@@ -25,7 +25,7 @@ function FreshBadge({ status }) {
   return <span className={`text-xs px-2 py-1 rounded-full ${styles[status] || ''}`}>{status}</span>
 }
 
-export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, onNavigatePricing, onNavigateImport }) {
+export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, onNavigatePricing, onNavigateImport, onNavigateHistory }) {
   const { user, signOut } = useAuth()
   const [stock, setStock] = useState([])
   const [stores, setStores] = useState([])
@@ -138,6 +138,12 @@ export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, o
           className="text-xs py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-medium transition"
         >
           คีย์ข้อมูล
+        </button>
+        <button
+          onClick={onNavigateHistory}
+          className="col-span-2 text-xs py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-medium transition"
+        >
+          ประวัติรายการ (แก้ไข/ลบ)
         </button>
       </nav>
 
