@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Select, Input } from '../components/FormFields'
 
-export default function PayoutForm({ onDone }) {
+export default function PayoutForm({ onDone, onToast }) {
   const [stores, setStores] = useState([])
   const [storeId, setStoreId] = useState('')
   const [settledOn, setSettledOn] = useState(new Date().toISOString().slice(0, 10))
@@ -41,14 +41,16 @@ export default function PayoutForm({ onDone }) {
 
     if (error) {
       setMsg({ type: 'err', text: error.message })
+      onToast?.({ type: 'error', text: 'บันทึกไม่สำเร็จ: ' + error.message })
     } else {
-      setMsg({ type: 'ok', text: 'บันทึกแล้ว' })
+      setMsg(null)
       setOrderNo('')
       setGrossPrice('')
       setActualAmount('')
       setBatchRef('')
       setNote('')
       onDone?.()
+      onToast?.({ type: 'ok', text: 'บันทึกยอดเงินแล้ว' })
     }
     setBusy(false)
   }
@@ -113,7 +115,7 @@ export default function PayoutForm({ onDone }) {
       />
 
       {msg && (
-        <p className={`text-sm ${msg.type === 'ok' ? 'text-teal-400' : 'text-red-400'}`}>{msg.text}</p>
+        <p className="text-sm text-red-400">{msg.text}</p>
       )}
 
       <button

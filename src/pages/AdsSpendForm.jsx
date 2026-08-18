@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Select, Input } from '../components/FormFields'
 
-export default function AdsSpendForm({ onDone }) {
+export default function AdsSpendForm({ onDone, onToast }) {
   const [stores, setStores] = useState([])
   const [storeId, setStoreId] = useState('')
   const [periodMonth, setPeriodMonth] = useState(new Date().toISOString().slice(0, 7) + '-01')
@@ -33,10 +33,12 @@ export default function AdsSpendForm({ onDone }) {
 
     if (error) {
       setMsg({ type: 'err', text: error.message })
+      onToast?.({ type: 'error', text: 'บันทึกไม่สำเร็จ: ' + error.message })
     } else {
-      setMsg({ type: 'ok', text: 'บันทึกแล้ว (ถ้ามีของเดือนนี้อยู่แล้วจะถูกอัปเดตทับ)' })
+      setMsg(null)
       setAmount('')
       onDone?.()
+      onToast?.({ type: 'ok', text: 'บันทึกค่าโฆษณาแล้ว' })
     }
     setBusy(false)
   }
@@ -70,7 +72,7 @@ export default function AdsSpendForm({ onDone }) {
       />
 
       {msg && (
-        <p className={`text-sm ${msg.type === 'ok' ? 'text-teal-400' : 'text-red-400'}`}>{msg.text}</p>
+        <p className="text-sm text-red-400">{msg.text}</p>
       )}
 
       <button

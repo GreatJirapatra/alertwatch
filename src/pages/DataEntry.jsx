@@ -2,6 +2,7 @@ import { useState } from 'react'
 import MovementForm from './MovementForm'
 import PayoutForm from './PayoutForm'
 import AdsSpendForm from './AdsSpendForm'
+import { Toast } from '../components/Toast'
 
 const TABS = [
   { key: 'movement', label: 'สต๊อก' },
@@ -11,6 +12,7 @@ const TABS = [
 
 export default function DataEntry({ onBack }) {
   const [tab, setTab] = useState('movement')
+  const [toast, setToast] = useState(null)
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
@@ -38,10 +40,12 @@ export default function DataEntry({ onBack }) {
       </div>
 
       <main className="p-4 max-w-md mx-auto">
-        {tab === 'movement' && <MovementForm />}
-        {tab === 'payout' && <PayoutForm />}
-        {tab === 'ads' && <AdsSpendForm />}
+        {tab === 'movement' && <MovementForm onToast={setToast} />}
+        {tab === 'payout' && <PayoutForm onToast={setToast} />}
+        {tab === 'ads' && <AdsSpendForm onToast={setToast} />}
       </main>
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   )
 }

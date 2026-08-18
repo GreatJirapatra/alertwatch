@@ -10,7 +10,7 @@ const KIND_OPTIONS = [
   { value: 'adjust', label: 'ปรับปรุงยอด (+/-)' },
 ]
 
-export default function MovementForm({ onDone }) {
+export default function MovementForm({ onDone, onToast }) {
   const { user } = useAuth()
   const [skus, setSkus] = useState([])
   const [stores, setStores] = useState([])
@@ -69,12 +69,14 @@ export default function MovementForm({ onDone }) {
 
     if (error) {
       setMsg({ type: 'err', text: error.message })
+      onToast?.({ type: 'error', text: 'บันทึกไม่สำเร็จ: ' + error.message })
     } else {
-      setMsg({ type: 'ok', text: 'บันทึกแล้ว' })
+      setMsg(null)
       setQty('')
       setOrderNo('')
       setNote('')
       onDone?.()
+      onToast?.({ type: 'ok', text: 'บันทึกรายการสต๊อกแล้ว' })
     }
     setBusy(false)
   }
@@ -139,7 +141,7 @@ export default function MovementForm({ onDone }) {
       />
 
       {msg && (
-        <p className={`text-sm ${msg.type === 'ok' ? 'text-teal-400' : 'text-red-400'}`}>{msg.text}</p>
+        <p className="text-sm text-red-400">{msg.text}</p>
       )}
 
       <button
