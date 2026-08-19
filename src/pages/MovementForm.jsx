@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { Select, Input } from '../components/FormFields'
+import { SearchableSelect } from '../components/SearchableSelect'
 
 const KIND_OPTIONS = [
   { value: 'in', label: 'รับเข้า (+)' },
@@ -14,24 +15,28 @@ export default function MovementForm({ onDone, onToast }) {
   const { user } = useAuth()
   const [skus, setSkus] = useState([])
   const [stores, setStores] = useState([])
+  const [provinces, setProvinces] = useState([])
   const [skuId, setSkuId] = useState('')
   const [storeId, setStoreId] = useState('')
   const [kind, setKind] = useState('out')
   const [qty, setQty] = useState('')
   const [movedOn, setMovedOn] = useState(new Date().toISOString().slice(0, 10))
   const [orderNo, setOrderNo] = useState('')
+  const [customerProvince, setCustomerProvince] = useState('')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null) // { type: 'ok'|'err', text }
 
   useEffect(() => {
     async function load() {
-      const [skuRes, storeRes] = await Promise.all([
+      const [skuRes, storeRes, provinceRes] = await Promise.all([
         supabase.from('skus').select('id, code, name').eq('active', true).order('code'),
         supabase.from('stores').select('id, name, kind').eq('active', true).order('kind').order('name'),
+        supabase.from('provinces').select('name').order('name'),
       ])
       setSkus(skuRes.data || [])
       setStores(storeRes.data || [])
+      setProvinces(provinceRes.data || [])
     }
     load()
   }, [])
@@ -63,6 +68,7 @@ export default function MovementForm({ onDone, onToast }) {
       qty: signedQty,
       moved_on: movedOn,
       order_no: orderNo || null,
+      customer_province: customerProvince || null,
       note: note || null,
       created_by: user?.id ?? null,
     })
@@ -74,6 +80,7 @@ export default function MovementForm({ onDone, onToast }) {
       setMsg(null)
       setQty('')
       setOrderNo('')
+      setCustomerProvince('')
       setNote('')
       onDone?.()
       onToast?.({ type: 'ok', text: 'บันทึกรายการสต๊อกแล้ว' })
@@ -130,6 +137,14 @@ export default function MovementForm({ onDone, onToast }) {
         value={orderNo}
         onChange={(e) => setOrderNo(e.target.value)}
         placeholder="เช่น MM-1023"
+      />
+
+      <SearchableSelect
+        label="จังหวัดลูกค้า (ถ้ามี — สำหรับข้อมูล marketing)"
+        value={customerProvince}
+        onChange={setCustomerProvince}
+        placeholder="ไม่ระบุ"
+        options={provinces.map((p) => ({ value: p.name, label: p.name }))}
       />
 
       <Input

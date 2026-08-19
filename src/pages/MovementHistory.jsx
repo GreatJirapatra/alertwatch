@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Select, Input } from '../components/FormFields'
+import { SearchableSelect } from '../components/SearchableSelect'
 import { ConfirmDeleteButton } from '../components/ConfirmDeleteButton'
 
 const KIND_OPTIONS = [
@@ -16,6 +17,7 @@ const PAGE_SIZE = 20
 export default function MovementHistory({ onToast }) {
   const [skus, setSkus] = useState([])
   const [stores, setStores] = useState([])
+  const [provinces, setProvinces] = useState([])
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -28,6 +30,7 @@ export default function MovementHistory({ onToast }) {
   useEffect(() => {
     supabase.from('skus').select('id, code, name').order('code').then(({ data }) => setSkus(data || []))
     supabase.from('stores').select('id, name, kind').order('kind').order('name').then(({ data }) => setStores(data || []))
+    supabase.from('provinces').select('name').order('name').then(({ data }) => setProvinces(data || []))
     loadPage(0, true)
   }, [])
 
@@ -39,7 +42,7 @@ export default function MovementHistory({ onToast }) {
 
     const { data, error } = await supabase
       .from('movements')
-      .select('id, sku_id, store_id, kind, qty, moved_on, order_no, note, created_at, skus(code, name), stores(name, kind)')
+      .select('id, sku_id, store_id, kind, qty, moved_on, order_no, customer_province, note, created_at, skus(code, name), stores(name, kind)')
       .order('created_at', { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1)
 
@@ -73,6 +76,7 @@ export default function MovementHistory({ onToast }) {
       qty: String(row.qty),
       moved_on: row.moved_on,
       order_no: row.order_no || '',
+      customer_province: row.customer_province || '',
       note: row.note || '',
     })
   }
@@ -97,6 +101,7 @@ export default function MovementHistory({ onToast }) {
         qty: Number(draft.qty),
         moved_on: draft.moved_on,
         order_no: draft.order_no || null,
+        customer_province: draft.customer_province || null,
         note: draft.note || null,
       })
       .eq('id', id)
@@ -179,6 +184,13 @@ export default function MovementHistory({ onToast }) {
                     onChange={(e) => setDraft((d) => ({ ...d, order_no: e.target.value }))}
                   />
                 </div>
+                <SearchableSelect
+                  label="จังหวัดลูกค้า"
+                  value={draft.customer_province}
+                  onChange={(v) => setDraft((d) => ({ ...d, customer_province: v }))}
+                  placeholder="ไม่ระบุ"
+                  options={provinces.map((p) => ({ value: p.name, label: p.name }))}
+                />
                 <Input
                   label="หมายเหตุ"
                   type="text"
@@ -213,6 +225,7 @@ export default function MovementHistory({ onToast }) {
                   <p className="text-xs text-slate-500 mt-1">
                     {row.moved_on} · {row.stores?.name || 'คลังกลาง'}
                     {row.order_no && ` · ${row.order_no}`}
+                    {row.customer_province && ` · จ.${row.customer_province}`}
                   </p>
                   {row.note && <p className="text-xs text-slate-500 mt-0.5">{row.note}</p>}
                 </div>

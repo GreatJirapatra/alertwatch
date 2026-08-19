@@ -5,6 +5,7 @@ import {
 } from 'recharts'
 import { supabase } from '../lib/supabase'
 import { exportToCsv, todayStamp } from '../lib/csvExport'
+import { Select } from '../components/FormFields'
 
 // เขียวเหลือเยอะ / เหลืองใกล้ต้องสั่ง / แดงต้องสั่งแล้วหรือหมด
 function stockColor(row) {
@@ -43,6 +44,10 @@ export default function Monitoring({ onBack }) {
   const [pl, setPl] = useState([])
   const [storeSales, setStoreSales] = useState([])
   const [salesRange, setSalesRange] = useState('30') // '7' | '30' | 'all'
+  const [provinceSku, setProvinceSku] = useState('') // '' = ทุก SKU
+  const [provinceMonth, setProvinceMonth] = useState(new Date().toISOString().slice(0, 7)) // 'YYYY-MM' หรือ 'all'
+  const [provinceData, setProvinceData] = useState([])
+  const [provinceLoading, setProvinceLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [salesLoading, setSalesLoading] = useState(false)
   const [error, setError] = useState('')
@@ -99,6 +104,45 @@ export default function Monitoring({ onBack }) {
     }
     loadStoreSales()
   }, [salesRange])
+
+  // ยอดขายตามจังหวัดลูกค้า — กรองได้ทั้งตาม SKU และเดือน เพื่อดูว่า SKU ไหน ขายดีจังหวัดไหน ช่วงไหน
+  useEffect(() => {
+    async function loadProvinceSales() {
+      setProvinceLoading(true)
+
+      let query = supabase
+        .from('movements')
+        .select('qty, customer_province')
+        .eq('kind', 'out')
+        .not('customer_province', 'is', null)
+
+      if (provinceSku) query = query.eq('sku_id', provinceSku)
+      if (provinceMonth !== 'all') {
+        const [y, m] = provinceMonth.split('-').map(Number)
+        const start = `${provinceMonth}-01`
+        const end = new Date(y, m, 0).toISOString().slice(0, 10) // วันสุดท้ายของเดือน
+        query = query.gte('moved_on', start).lte('moved_on', end)
+      }
+
+      const { data, error } = await query
+      if (error) {
+        setProvinceData([])
+        setProvinceLoading(false)
+        return
+      }
+
+      const unitsByProvince = {}
+      for (const m of data || []) {
+        unitsByProvince[m.customer_province] = (unitsByProvince[m.customer_province] || 0) + Math.abs(m.qty)
+      }
+      const arr = Object.entries(unitsByProvince)
+        .map(([province, units]) => ({ province, units }))
+        .sort((a, b) => b.units - a.units)
+      setProvinceData(arr)
+      setProvinceLoading(false)
+    }
+    loadProvinceSales()
+  }, [provinceSku, provinceMonth])
 
   async function exportStockStatus() {
     setExportBusy('stock')
@@ -167,6 +211,44 @@ export default function Monitoring({ onBack }) {
     setExportBusy('')
   }
 
+  async function exportProvinceSales() {
+    setExportBusy('province')
+    const { data, error } = await supabase
+      .from('movements')
+      .select('moved_on, qty, customer_province, skus(code, name)')
+      .eq('kind', 'out')
+      .not('customer_province', 'is', null)
+      .order('moved_on', { ascending: false })
+
+    if (error) {
+      alert('ดึงข้อมูลไม่สำเร็จ: ' + error.message)
+    } else {
+      // รวมยอดตาม SKU + จังหวัด + เดือน (pivot) เพื่อดูว่า SKU ไหน ขายดีจังหวัดไหน เดือนไหน
+      const map = new Map()
+      for (const r of data || []) {
+        const month = r.moved_on.slice(0, 7)
+        const key = `${r.skus?.code}|${r.customer_province}|${month}`
+        if (!map.has(key)) {
+          map.set(key, {
+            เดือน: month,
+            รหัสสินค้า: r.skus?.code || '',
+            ชื่อสินค้า: r.skus?.name || '',
+            จังหวัด: r.customer_province,
+            ปริมาณ_ชิ้น: 0,
+          })
+        }
+        map.get(key).ปริมาณ_ชิ้น += Math.abs(r.qty)
+      }
+      const rows = [...map.values()].sort((a, b) => {
+        if (a.เดือน !== b.เดือน) return b.เดือน.localeCompare(a.เดือน)
+        if (a.รหัสสินค้า !== b.รหัสสินค้า) return a.รหัสสินค้า.localeCompare(b.รหัสสินค้า)
+        return b.ปริมาณ_ชิ้น - a.ปริมาณ_ชิ้น
+      })
+      exportToCsv(`ยอดขายตามจังหวัด_${todayStamp()}.csv`, rows)
+    }
+    setExportBusy('')
+  }
+
   const pieData = stock.map((s) => ({ name: s.code, value: s.on_hand }))
 
   return (
@@ -209,6 +291,13 @@ export default function Monitoring({ onBack }) {
               className="text-sm py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition disabled:opacity-50 text-left px-3"
             >
               {exportBusy === 'movements' ? 'กำลังเตรียมไฟล์...' : '📋 รายการเคลื่อนไหวสต๊อกทั้งหมด'}
+            </button>
+            <button
+              onClick={exportProvinceSales}
+              disabled={exportBusy !== ''}
+              className="text-sm py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition disabled:opacity-50 text-left px-3"
+            >
+              {exportBusy === 'province' ? 'กำลังเตรียมไฟล์...' : '🗺️ ยอดขายตามจังหวัด (SKU × เดือน)'}
             </button>
           </div>
         </section>
@@ -382,6 +471,63 @@ export default function Monitoring({ onBack }) {
                       <YAxis type="category" dataKey="name" stroke="#94a3b8" fontSize={11} width={90} />
                       <Tooltip contentStyle={tooltipStyle()} formatter={(value) => [`${value} ชิ้น`, 'ขายแล้ว']} />
                       <Bar dataKey="units" fill="#38bdf8" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </section>
+
+            {/* 5. ยอดขายตามจังหวัดลูกค้า — กรองตาม SKU และเดือน สำหรับข้อมูล marketing */}
+            <section className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+              <h2 className="text-sm font-semibold text-slate-200 mb-1">ยอดขายตามจังหวัดลูกค้า</h2>
+              <p className="text-xs text-slate-500 mb-3">
+                ดูว่า SKU ไหนขายดีจังหวัดไหน ช่วงเดือนไหน — นับเฉพาะรายการที่คีย์จังหวัดลูกค้าไว้ตอนขายออก
+              </p>
+
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <Select
+                  label="สินค้า"
+                  value={provinceSku}
+                  onChange={setProvinceSku}
+                  placeholder="ทุก SKU"
+                  options={stock.map((s) => ({ value: s.id, label: `${s.code} — ${s.name}` }))}
+                />
+                <div>
+                  <label className="text-xs text-slate-400">เดือน</label>
+                  <div className="flex gap-1.5 mt-1">
+                    <input
+                      type="month"
+                      value={provinceMonth === 'all' ? new Date().toISOString().slice(0, 7) : provinceMonth}
+                      onChange={(e) => setProvinceMonth(e.target.value)}
+                      disabled={provinceMonth === 'all'}
+                      className="flex-1 min-w-0 px-2 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-teal-500 disabled:opacity-40"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setProvinceMonth((m) => (m === 'all' ? new Date().toISOString().slice(0, 7) : 'all'))}
+                      className={`text-xs px-2.5 rounded-lg font-medium transition flex-shrink-0 ${
+                        provinceMonth === 'all' ? 'bg-teal-600 text-white' : 'bg-slate-700 text-slate-400'
+                      }`}
+                    >
+                      ทั้งหมด
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ width: '100%', height: Math.max(160, provinceData.length * 36) }}>
+                {provinceLoading ? (
+                  <p className="text-slate-500 text-sm">กำลังโหลด...</p>
+                ) : provinceData.length === 0 ? (
+                  <p className="text-slate-500 text-sm">ไม่มีข้อมูลจังหวัดลูกค้าตามเงื่อนไขที่เลือก</p>
+                ) : (
+                  <ResponsiveContainer>
+                    <BarChart data={provinceData} layout="vertical" margin={{ left: 8, right: 16 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
+                      <XAxis type="number" stroke="#64748b" fontSize={11} />
+                      <YAxis type="category" dataKey="province" stroke="#94a3b8" fontSize={11} width={90} />
+                      <Tooltip contentStyle={tooltipStyle()} formatter={(value) => [`${value} ชิ้น`, 'ขายแล้ว']} />
+                      <Bar dataKey="units" fill="#a78bfa" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
