@@ -105,23 +105,22 @@ export default function Monitoring({ onBack }) {
     loadStoreSales()
   }, [salesRange])
 
-  // ยอดขายตามจังหวัดลูกค้า — กรองได้ทั้งตาม SKU และเดือน เพื่อดูว่า SKU ไหน ขายดีจังหวัดไหน ช่วงไหน
+  // ยอดขายตามจังหวัดลูกค้า — รวมทั้งข้อมูลปัจจุบัน (movements) และย้อนหลังที่นำเข้า (historical_sales)
+  // กรองได้ทั้งตาม SKU และเดือน เพื่อดูว่า SKU ไหน ขายดีจังหวัดไหน ช่วงไหน
   useEffect(() => {
     async function loadProvinceSales() {
       setProvinceLoading(true)
 
       let query = supabase
-        .from('movements')
+        .from('province_sales_unified')
         .select('qty, customer_province')
-        .eq('kind', 'out')
-        .not('customer_province', 'is', null)
 
       if (provinceSku) query = query.eq('sku_id', provinceSku)
       if (provinceMonth !== 'all') {
         const [y, m] = provinceMonth.split('-').map(Number)
         const start = `${provinceMonth}-01`
         const end = new Date(y, m, 0).toISOString().slice(0, 10) // วันสุดท้ายของเดือน
-        query = query.gte('moved_on', start).lte('moved_on', end)
+        query = query.gte('sold_on', start).lte('sold_on', end)
       }
 
       const { data, error } = await query
@@ -213,26 +212,29 @@ export default function Monitoring({ onBack }) {
 
   async function exportProvinceSales() {
     setExportBusy('province')
-    const { data, error } = await supabase
-      .from('movements')
-      .select('moved_on, qty, customer_province, skus(code, name)')
-      .eq('kind', 'out')
-      .not('customer_province', 'is', null)
-      .order('moved_on', { ascending: false })
+    const [salesRes, skuRes] = await Promise.all([
+      supabase
+        .from('province_sales_unified')
+        .select('sold_on, qty, customer_province, sku_id')
+        .order('sold_on', { ascending: false }),
+      supabase.from('skus').select('id, code, name'),
+    ])
 
-    if (error) {
-      alert('ดึงข้อมูลไม่สำเร็จ: ' + error.message)
+    if (salesRes.error) {
+      alert('ดึงข้อมูลไม่สำเร็จ: ' + salesRes.error.message)
     } else {
+      const skuMap = new Map((skuRes.data || []).map((s) => [s.id, s]))
       // รวมยอดตาม SKU + จังหวัด + เดือน (pivot) เพื่อดูว่า SKU ไหน ขายดีจังหวัดไหน เดือนไหน
       const map = new Map()
-      for (const r of data || []) {
-        const month = r.moved_on.slice(0, 7)
-        const key = `${r.skus?.code}|${r.customer_province}|${month}`
+      for (const r of salesRes.data || []) {
+        const month = r.sold_on.slice(0, 7)
+        const sku = skuMap.get(r.sku_id)
+        const key = `${sku?.code}|${r.customer_province}|${month}`
         if (!map.has(key)) {
           map.set(key, {
             เดือน: month,
-            รหัสสินค้า: r.skus?.code || '',
-            ชื่อสินค้า: r.skus?.name || '',
+            รหัสสินค้า: sku?.code || '',
+            ชื่อสินค้า: sku?.name || '',
             จังหวัด: r.customer_province,
             ปริมาณ_ชิ้น: 0,
           })
