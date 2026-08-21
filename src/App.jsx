@@ -7,10 +7,11 @@ import Monitoring from './pages/Monitoring'
 import PricingCalculator from './pages/PricingCalculator'
 import ImportShopee from './pages/ImportShopee'
 import History from './pages/History'
+import SkuManager from './pages/SkuManager'
 
 function AppContent() {
   const { session, loading } = useAuth()
-  const [view, setView] = useState('dashboard') // dashboard | dataEntry | monitoring | pricing | import | history
+  const [view, setView] = useState('dashboard') // dashboard | dataEntry | monitoring | pricing | import | history | skuManager
 
   if (loading) {
     return (
@@ -42,6 +43,10 @@ function AppContent() {
     return <History onBack={() => setView('dashboard')} />
   }
 
+  if (view === 'skuManager') {
+    return <SkuManager onBack={() => setView('dashboard')} />
+  }
+
   return (
     <Dashboard
       onNavigateDataEntry={() => setView('dataEntry')}
@@ -49,6 +54,7 @@ function AppContent() {
       onNavigatePricing={() => setView('pricing')}
       onNavigateImport={() => setView('import')}
       onNavigateHistory={() => setView('history')}
+      onNavigateSkuManager={() => setView('skuManager')}
     />
   )
 }
