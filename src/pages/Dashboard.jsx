@@ -26,7 +26,7 @@ function FreshBadge({ status }) {
   return <span className={`text-xs px-2 py-1 rounded-full ${styles[status] || ''}`}>{status}</span>
 }
 
-export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, onNavigatePricing, onNavigateImport, onNavigateHistory, onNavigateSkuManager, onNavigateRegionalMap }) {
+export default function Dashboard({ onNavigateDataEntry, onNavigateStockMonitoring, onNavigateFinanceMonitoring, onNavigatePricing, onNavigateImport, onNavigateHistory, onNavigateSkuManager, onNavigateRegionalMap }) {
   const { user, signOut } = useAuth()
   const [stock, setStock] = useState([])
   const [stores, setStores] = useState([])
@@ -117,10 +117,16 @@ export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, o
 
       <nav className="px-4 py-3 grid grid-cols-2 gap-2 max-w-3xl mx-auto border-b border-slate-800/60">
         <button
-          onClick={onNavigateMonitoring}
+          onClick={onNavigateStockMonitoring}
           className="text-xs py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium transition"
         >
-          Monitoring
+          📦 Stock Monitoring
+        </button>
+        <button
+          onClick={onNavigateFinanceMonitoring}
+          className="text-xs py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium transition"
+        >
+          💰 Finance Monitoring
         </button>
         <button
           onClick={onNavigatePricing}

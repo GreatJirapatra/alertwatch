@@ -3,7 +3,8 @@ import { AuthProvider, useAuth } from './lib/AuthContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import DataEntry from './pages/DataEntry'
-import Monitoring from './pages/Monitoring'
+import StockMonitoring from './pages/StockMonitoring'
+import FinanceMonitoring from './pages/FinanceMonitoring'
 import PricingCalculator from './pages/PricingCalculator'
 import ImportShopee from './pages/ImportShopee'
 import History from './pages/History'
@@ -12,7 +13,7 @@ import RegionalMap from './pages/RegionalMap'
 
 function AppContent() {
   const { session, loading } = useAuth()
-  const [view, setView] = useState('dashboard') // dashboard | dataEntry | monitoring | pricing | import | history | skuManager | regionalMap
+  const [view, setView] = useState('dashboard') // dashboard | dataEntry | stockMonitoring | financeMonitoring | pricing | import | history | skuManager | regionalMap
 
   if (loading) {
     return (
@@ -28,8 +29,12 @@ function AppContent() {
     return <DataEntry onBack={() => setView('dashboard')} />
   }
 
-  if (view === 'monitoring') {
-    return <Monitoring onBack={() => setView('dashboard')} />
+  if (view === 'stockMonitoring') {
+    return <StockMonitoring onBack={() => setView('dashboard')} />
+  }
+
+  if (view === 'financeMonitoring') {
+    return <FinanceMonitoring onBack={() => setView('dashboard')} />
   }
 
   if (view === 'pricing') {
@@ -55,7 +60,8 @@ function AppContent() {
   return (
     <Dashboard
       onNavigateDataEntry={() => setView('dataEntry')}
-      onNavigateMonitoring={() => setView('monitoring')}
+      onNavigateStockMonitoring={() => setView('stockMonitoring')}
+      onNavigateFinanceMonitoring={() => setView('financeMonitoring')}
       onNavigatePricing={() => setView('pricing')}
       onNavigateImport={() => setView('import')}
       onNavigateHistory={() => setView('history')}

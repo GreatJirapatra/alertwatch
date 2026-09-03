@@ -39,9 +39,8 @@ function tooltipStyle() {
   }
 }
 
-export default function Monitoring({ onBack }) {
+export default function StockMonitoring({ onBack }) {
   const [stock, setStock] = useState([])
-  const [pl, setPl] = useState([])
   const [storeSales, setStoreSales] = useState([])
   const [salesRange, setSalesRange] = useState('30') // '7' | '30' | 'all'
   const [provinceSku, setProvinceSku] = useState('') // '' = ทุก SKU
@@ -56,20 +55,9 @@ export default function Monitoring({ onBack }) {
   useEffect(() => {
     async function load() {
       setLoading(true)
-
-      const [stockRes, plRes] = await Promise.all([
-        supabase.from('stock_status').select('*').order('code'),
-        supabase.from('monthly_pl').select('*').order('month', { ascending: true }).limit(6),
-      ])
-
-      if (stockRes.error) setError(stockRes.error.message)
-
-      setStock(stockRes.data || [])
-      setPl((plRes.data || []).map((m) => ({
-        ...m,
-        monthLabel: new Date(m.month).toLocaleDateString('th-TH', { month: 'short', year: '2-digit' }),
-      })))
-
+      const { data, error } = await supabase.from('stock_status').select('*').order('code')
+      if (error) setError(error.message)
+      setStock(data || [])
       setLoading(false)
     }
     load()
@@ -106,7 +94,6 @@ export default function Monitoring({ onBack }) {
   }, [salesRange])
 
   // ยอดขายตามจังหวัดลูกค้า — รวมทั้งข้อมูลปัจจุบัน (movements) และย้อนหลังที่นำเข้า (historical_sales)
-  // กรองได้ทั้งตาม SKU และเดือน เพื่อดูว่า SKU ไหน ขายดีจังหวัดไหน ช่วงไหน
   useEffect(() => {
     async function loadProvinceSales() {
       setProvinceLoading(true)
@@ -119,7 +106,7 @@ export default function Monitoring({ onBack }) {
       if (provinceMonth !== 'all') {
         const [y, m] = provinceMonth.split('-').map(Number)
         const start = `${provinceMonth}-01`
-        const end = new Date(y, m, 0).toISOString().slice(0, 10) // วันสุดท้ายของเดือน
+        const end = new Date(y, m, 0).toISOString().slice(0, 10)
         query = query.gte('sold_on', start).lte('sold_on', end)
       }
 
@@ -158,27 +145,6 @@ export default function Monitoring({ onBack }) {
         เงินจมในสต๊อกนี้: r.capital_value,
         จุดสั่งซื้อ: r.reorder_point,
         สถานะ: r.action,
-      })))
-    }
-    setExportBusy('')
-  }
-
-  async function exportMonthlyPl() {
-    setExportBusy('pl')
-    const { data, error } = await supabase.from('monthly_pl').select('*').order('month', { ascending: false })
-    if (error) {
-      alert('ดึงข้อมูลไม่สำเร็จ: ' + error.message)
-    } else {
-      exportToCsv(`สรุปกำไรขาดทุนรายเดือน_${todayStamp()}.csv`, (data || []).map((r) => ({
-        เดือน: new Date(r.month).toLocaleDateString('th-TH', { year: 'numeric', month: 'long' }),
-        จำนวนชิ้นที่ขาย: r.units,
-        เงินเข้าจริง: r.received,
-        ต้นทุนขาย: r.cogs,
-        ค่าโฆษณา: r.ads,
-        กำไรสุทธิ: r.net_profit,
-        มาร์จิ้นสุทธิ: r.net_margin != null ? (r.net_margin * 100).toFixed(2) + '%' : '',
-        ต้นทุนที่ยังไม่รู้ผล_ยังไม่มีpayoutคู่กัน: r.unmatched_cogs || 0,
-        เงินเข้าที่ยังไม่ผูกออเดอร์: r.unmatched_received || 0,
       })))
     }
     setExportBusy('')
@@ -224,7 +190,6 @@ export default function Monitoring({ onBack }) {
       alert('ดึงข้อมูลไม่สำเร็จ: ' + salesRes.error.message)
     } else {
       const skuMap = new Map((skuRes.data || []).map((s) => [s.id, s]))
-      // รวมยอดตาม SKU + จังหวัด + เดือน (pivot) เพื่อดูว่า SKU ไหน ขายดีจังหวัดไหน เดือนไหน
       const map = new Map()
       for (const r of salesRes.data || []) {
         const month = r.sold_on.slice(0, 7)
@@ -259,7 +224,7 @@ export default function Monitoring({ onBack }) {
         <button onClick={onBack} className="text-slate-400 hover:text-teal-400 transition text-sm">
           ← กลับ
         </button>
-        <h1 className="text-lg font-bold">Monitoring</h1>
+        <h1 className="text-lg font-bold">Stock Monitoring</h1>
       </header>
 
       <main className="p-4 space-y-6 max-w-3xl mx-auto">
@@ -279,13 +244,6 @@ export default function Monitoring({ onBack }) {
               className="text-sm py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition disabled:opacity-50 text-left px-3"
             >
               {exportBusy === 'stock' ? 'กำลังเตรียมไฟล์...' : '📦 สต็อกคงเหลือปัจจุบัน'}
-            </button>
-            <button
-              onClick={exportMonthlyPl}
-              disabled={exportBusy !== ''}
-              className="text-sm py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition disabled:opacity-50 text-left px-3"
-            >
-              {exportBusy === 'pl' ? 'กำลังเตรียมไฟล์...' : '📊 สรุปกำไรขาดทุนรายเดือน'}
             </button>
             <button
               onClick={exportMovements}
@@ -375,9 +333,9 @@ export default function Monitoring({ onBack }) {
                   <Bar dataKey="days_cover" radius={[0, 4, 4, 0]}>
                     {stock.map((row) => (
                       <Cell key={row.id} fill={
-                        row.days_cover == null || row.days_cover > 90 ? '#ef4444' // แดง หมุนช้ามาก/dead stock
-                        : row.days_cover > 30 ? '#f59e0b' // เหลือง ปานกลาง
-                        : '#14b8a6' // เขียว หมุนเร็ว
+                        row.days_cover == null || row.days_cover > 90 ? '#ef4444'
+                        : row.days_cover > 30 ? '#f59e0b'
+                        : '#14b8a6'
                       } />
                     ))}
                   </Bar>
@@ -409,31 +367,7 @@ export default function Monitoring({ onBack }) {
               </ResponsiveContainer>
             </ChartCard>
 
-            {/* 3. กำไรสุทธิรายเดือน */}
-            <ChartCard title="กำไรสุทธิรายเดือน" subtitle="บาท ต่อเดือน (6 เดือนล่าสุดที่มีข้อมูล)">
-              {pl.length === 0 ? (
-                <p className="text-slate-500 text-sm">ยังไม่มีข้อมูลกำไร/ขาดทุนรายเดือน</p>
-              ) : (
-                <ResponsiveContainer>
-                  <BarChart data={pl} margin={{ left: 8, right: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                    <XAxis dataKey="monthLabel" stroke="#94a3b8" fontSize={11} />
-                    <YAxis stroke="#64748b" fontSize={11} />
-                    <Tooltip
-                      contentStyle={tooltipStyle()}
-                      formatter={(value) => [`${Number(value).toLocaleString('th-TH')} บาท`, 'กำไรสุทธิ']}
-                    />
-                    <Bar dataKey="net_profit" radius={[4, 4, 0, 0]}>
-                      {pl.map((row, i) => (
-                        <Cell key={i} fill={row.net_profit >= 0 ? '#14b8a6' : '#ef4444'} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </ChartCard>
-
-            {/* 4. เปรียบเทียบยอดขายรายร้าน */}
+            {/* 3. เปรียบเทียบยอดขายรายร้าน */}
             <section className="bg-slate-800 rounded-xl p-4 border border-slate-700">
               <div className="flex items-center justify-between mb-1">
                 <h2 className="text-sm font-semibold text-slate-200">ยอดขายรายร้าน (จำนวนชิ้น)</h2>
@@ -479,7 +413,7 @@ export default function Monitoring({ onBack }) {
               </div>
             </section>
 
-            {/* 5. ยอดขายตามจังหวัดลูกค้า — กรองตาม SKU และเดือน สำหรับข้อมูล marketing */}
+            {/* 4. ยอดขายตามจังหวัดลูกค้า — กรองตาม SKU และเดือน */}
             <section className="bg-slate-800 rounded-xl p-4 border border-slate-700">
               <h2 className="text-sm font-semibold text-slate-200 mb-1">ยอดขายตามจังหวัดลูกค้า</h2>
               <p className="text-xs text-slate-500 mb-3">
