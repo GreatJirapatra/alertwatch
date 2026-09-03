@@ -25,7 +25,7 @@ function FreshBadge({ status }) {
   return <span className={`text-xs px-2 py-1 rounded-full ${styles[status] || ''}`}>{status}</span>
 }
 
-export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, onNavigatePricing, onNavigateImport, onNavigateHistory, onNavigateSkuManager }) {
+export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, onNavigatePricing, onNavigateImport, onNavigateHistory, onNavigateSkuManager, onNavigateRegionalMap }) {
   const { user, signOut } = useAuth()
   const [stock, setStock] = useState([])
   const [stores, setStores] = useState([])
@@ -150,6 +150,12 @@ export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, o
           className="text-xs py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-medium transition"
         >
           จัดการสินค้า / ต้นทุน
+        </button>
+        <button
+          onClick={onNavigateRegionalMap}
+          className="col-span-2 text-xs py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-medium transition"
+        >
+          🗺️ แผนที่ยอดขายตามภาค / ฤดูกาล
         </button>
       </nav>
 

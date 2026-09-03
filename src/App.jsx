@@ -8,10 +8,11 @@ import PricingCalculator from './pages/PricingCalculator'
 import ImportShopee from './pages/ImportShopee'
 import History from './pages/History'
 import SkuManager from './pages/SkuManager'
+import RegionalMap from './pages/RegionalMap'
 
 function AppContent() {
   const { session, loading } = useAuth()
-  const [view, setView] = useState('dashboard') // dashboard | dataEntry | monitoring | pricing | import | history | skuManager
+  const [view, setView] = useState('dashboard') // dashboard | dataEntry | monitoring | pricing | import | history | skuManager | regionalMap
 
   if (loading) {
     return (
@@ -47,6 +48,10 @@ function AppContent() {
     return <SkuManager onBack={() => setView('dashboard')} />
   }
 
+  if (view === 'regionalMap') {
+    return <RegionalMap onBack={() => setView('dashboard')} />
+  }
+
   return (
     <Dashboard
       onNavigateDataEntry={() => setView('dataEntry')}
@@ -55,6 +60,7 @@ function AppContent() {
       onNavigateImport={() => setView('import')}
       onNavigateHistory={() => setView('history')}
       onNavigateSkuManager={() => setView('skuManager')}
+      onNavigateRegionalMap={() => setView('regionalMap')}
     />
   )
 }
