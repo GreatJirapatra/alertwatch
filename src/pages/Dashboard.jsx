@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 
@@ -40,7 +41,7 @@ export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, o
     const [stockRes, storesRes, plRes, todayRes] = await Promise.all([
       supabase.from('stock_status').select('*').order('code'),
       supabase.from('store_freshness').select('*').order('kind').order('name'),
-      supabase.from('monthly_pl').select('*').limit(3),
+      supabase.from('monthly_revenue_profit_unified').select('*').order('month', { ascending: false }).limit(12),
       supabase
         .from('movements')
         .select('qty, kind, store_id, stores(name, kind)')
@@ -51,7 +52,7 @@ export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, o
     if (stockRes.error) setError(stockRes.error.message)
     setStock(stockRes.data || [])
     setStores(storesRes.data || [])
-    setPl(plRes.data || [])
+    setPl((plRes.data || []).slice().reverse()) // เรียงเก่า→ใหม่ ให้กราฟอ่านซ้ายไปขวาเป็นธรรมชาติ
 
     // รวมยอดขายวันนี้ (จำนวนชิ้น) แยกตามร้าน
     const byStore = {}
@@ -265,28 +266,34 @@ export default function Dashboard({ onNavigateDataEntry, onNavigateMonitoring, o
               </div>
             </section>
 
-            {/* กำไรขาดทุนรายเดือน */}
+            {/* รายได้และกำไรรายเดือน — ยึดวันที่ขายออกจริง รวมทั้งข้อมูลปัจจุบันและย้อนหลัง */}
             {pl.length > 0 && (
               <section>
-                <h2 className="text-sm font-semibold text-slate-300 mb-2">กำไรสุทธิรายเดือน (3 เดือนล่าสุด)</h2>
-                <p className="text-xs text-slate-500 mb-2">นับกำไรตามเดือนที่เงินเข้าจริง จับคู่กับต้นทุนของออเดอร์เดียวกัน</p>
-                <div className="bg-slate-800 rounded-lg border border-slate-700 divide-y divide-slate-700">
-                  {pl.map((m) => (
-                    <div key={m.month} className="p-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm">{new Date(m.month).toLocaleDateString('th-TH', { year: 'numeric', month: 'long' })}</p>
-                        <p className={`text-sm font-medium ${m.net_profit >= 0 ? 'text-teal-400' : 'text-red-400'}`}>
-                          {m.net_profit?.toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท
-                        </p>
-                      </div>
-                      {(m.unmatched_cogs > 0 || m.unmatched_received > 0) && (
-                        <p className="text-xs text-yellow-400/80 mt-1">
-                          ⚠ ยังไม่รวม: ต้นทุนที่ยังไม่รู้ผล {(m.unmatched_cogs || 0).toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท
-                          {m.unmatched_received > 0 && ` · เงินเข้าที่ยังไม่ผูกออเดอร์ ${m.unmatched_received.toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท`}
-                        </p>
-                      )}
-                    </div>
-                  ))}
+                <h2 className="text-sm font-semibold text-slate-300 mb-2">รายได้และกำไรรายเดือน</h2>
+                <p className="text-xs text-slate-500 mb-2">นับตามวันที่ขายออกจริง รวมข้อมูลปัจจุบันและย้อนหลังที่นำเข้าไว้</p>
+                <div className="bg-slate-800 rounded-xl p-3 border border-slate-700">
+                  <div style={{ width: '100%', height: 220 }}>
+                    <ResponsiveContainer>
+                      <BarChart data={pl} margin={{ left: -15, right: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                        <XAxis
+                          dataKey="month"
+                          stroke="#94a3b8"
+                          fontSize={10}
+                          tickFormatter={(m) => new Date(m).toLocaleDateString('th-TH', { month: 'short', year: '2-digit' })}
+                        />
+                        <YAxis stroke="#64748b" fontSize={10} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                        <Tooltip
+                          contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
+                          labelFormatter={(m) => new Date(m).toLocaleDateString('th-TH', { year: 'numeric', month: 'long' })}
+                          formatter={(value, name) => [`${Number(value).toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท`, name]}
+                        />
+                        <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => (v === 'revenue' ? 'รายได้' : 'กำไร')} />
+                        <Bar dataKey="revenue" fill="#2dd4bf" radius={[3, 3, 0, 0]} />
+                        <Bar dataKey="profit" fill="#a78bfa" radius={[3, 3, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               </section>
             )}

@@ -41,6 +41,7 @@ function ThailandRegionMap({ regionTotals, maxValue }) {
 export default function RegionalMap({ onBack }) {
   const [skus, setSkus] = useState([])
   const [selectedSku, setSelectedSku] = useState('') // '' = ทุกสินค้ารวมกัน
+  const [selectedSeason, setSelectedSeason] = useState('') // '' = ทุกฤดู — ใช้กรองแผนที่ตอนเลือก SKU แล้ว
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -60,28 +61,50 @@ export default function RegionalMap({ onBack }) {
     load()
   }, [selectedSku])
 
+  // เปลี่ยน SKU แล้วรีเซ็ตตัวกรองฤดูกาล กันค้างฤดูเดิมไว้โดยไม่ตั้งใจ
+  useEffect(() => { setSelectedSeason('') }, [selectedSku])
+
+  function seasonOf(sold_on) {
+    return MONTH_TO_SEASON[Number(sold_on.slice(5, 7))]
+  }
+
+  // แผนที่ภาค — กรองตามฤดูที่เลือกด้วย (ถ้าเลือกไว้)
   const regionTotals = useMemo(() => {
     const totals = {}
     for (const r of rows) {
+      if (selectedSeason && seasonOf(r.sold_on) !== selectedSeason) continue
       const region = PROVINCE_TO_REGION[r.customer_province]
       if (!region) continue
       totals[region] = (totals[region] || 0) + Math.abs(r.qty)
     }
     return totals
-  }, [rows])
+  }, [rows, selectedSeason])
 
   const maxRegionValue = Math.max(0, ...Object.values(regionTotals))
 
-  // ยอดตามฤดูกาลของสินค้าที่เลือก (แสดงเป็นกราฟแท่ง)
+  // ยอดตามฤดูกาลของสินค้าที่เลือก (แสดงเป็นกราฟแท่ง) — ไม่กรองตามภาค นับรวมทุกภาค
   const seasonChartData = useMemo(() => {
     const totals = { summer: 0, rainy: 0, winter: 0 }
     for (const r of rows) {
-      const month = Number(r.sold_on.slice(5, 7))
-      const season = MONTH_TO_SEASON[month]
+      const season = seasonOf(r.sold_on)
       if (season) totals[season] += Math.abs(r.qty)
     }
     return SEASONS.map((s) => ({ label: s.label.split(' ')[0], value: totals[s.key] }))
   }, [rows])
+
+  // ตาราง ภาค × ฤดู ของสินค้าที่เลือก — ให้เห็นครบทุกช่องพร้อมกัน ไม่ต้องสลับตัวกรองทีละฤดู
+  const regionSeasonMatrix = useMemo(() => {
+    if (!selectedSku) return null
+    const matrix = {}
+    for (const r of REGIONS) matrix[r.key] = { summer: 0, rainy: 0, winter: 0 }
+    for (const row of rows) {
+      const region = PROVINCE_TO_REGION[row.customer_province]
+      const season = seasonOf(row.sold_on)
+      if (!region || !season) continue
+      matrix[region][season] += Math.abs(row.qty)
+    }
+    return matrix
+  }, [rows, selectedSku])
 
   // ตอนดูภาพรวมทุกสินค้า: สินค้าขายดีสุดของแต่ละฤดูกาล
   const topBySeason = useMemo(() => {
@@ -132,8 +155,57 @@ export default function RegionalMap({ onBack }) {
           <>
             <section className="bg-slate-800 rounded-xl p-4 border border-slate-700">
               <p className="text-xs text-slate-500 mb-2">แผนที่เป็นแบบเสมือน (ไม่ใช่เส้นเขตแดนจริง) ใช้แค่บอกตำแหน่งภาคคร่าวๆ</p>
+
+              {selectedSku && (
+                <div className="flex gap-1.5 mb-3">
+                  {[{ key: '', label: 'ทุกฤดู' }, ...SEASONS.map((s) => ({ key: s.key, label: s.label.split(' ')[0] }))].map((opt) => (
+                    <button
+                      key={opt.key || 'all'}
+                      onClick={() => setSelectedSeason(opt.key)}
+                      className={`flex-1 text-xs py-1.5 rounded-lg transition ${
+                        selectedSeason === opt.key ? 'bg-teal-600 text-white' : 'bg-slate-900 text-slate-400 border border-slate-700'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <ThailandRegionMap regionTotals={regionTotals} maxValue={maxRegionValue} />
             </section>
+
+            {selectedSku && regionSeasonMatrix && (
+              <section className="bg-slate-800 rounded-xl p-4 border border-slate-700 overflow-x-auto">
+                <h2 className="text-sm font-semibold text-slate-200 mb-3">ตารางภาค × ฤดูกาล (ชิ้น)</h2>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-slate-500 text-xs border-b border-slate-700">
+                      <th className="text-left py-1.5 font-normal">ภาค</th>
+                      {SEASONS.map((s) => (
+                        <th key={s.key} className="text-right py-1.5 font-normal">{s.label.split(' ')[0]}</th>
+                      ))}
+                      <th className="text-right py-1.5 font-normal">รวม</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/60">
+                    {REGIONS.map((r) => {
+                      const row = regionSeasonMatrix[r.key]
+                      const total = row.summer + row.rainy + row.winter
+                      return (
+                        <tr key={r.key}>
+                          <td className="py-1.5 text-slate-300">{r.label}</td>
+                          <td className="text-right py-1.5 text-slate-300">{row.summer || '–'}</td>
+                          <td className="text-right py-1.5 text-slate-300">{row.rainy || '–'}</td>
+                          <td className="text-right py-1.5 text-slate-300">{row.winter || '–'}</td>
+                          <td className="text-right py-1.5 font-medium text-teal-400">{total || '–'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </section>
+            )}
 
             {selectedSku ? (
               <section className="bg-slate-800 rounded-xl p-4 border border-slate-700">
