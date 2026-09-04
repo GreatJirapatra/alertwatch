@@ -2,11 +2,21 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Select, Input } from '../components/FormFields'
 
+// หาวันเสาร์ล่าสุด (หรือวันนี้ถ้าเป็นเสาร์อยู่แล้ว) ไว้ตั้งค่าเริ่มต้นของ "สัปดาห์ที่สิ้นสุดวันที่"
+function lastSaturday() {
+  const d = new Date()
+  const day = d.getDay() // 0=อาทิตย์ ... 6=เสาร์
+  const diff = (day + 1) % 7 // จำนวนวันย้อนไปหาเสาร์ล่าสุด
+  d.setDate(d.getDate() - diff)
+  return d.toISOString().slice(0, 10)
+}
+
 export default function AdsSpendForm({ onDone, onToast }) {
   const [stores, setStores] = useState([])
   const [storeId, setStoreId] = useState('')
-  const [periodMonth, setPeriodMonth] = useState(new Date().toISOString().slice(0, 7) + '-01')
+  const [weekEnding, setWeekEnding] = useState(lastSaturday())
   const [amount, setAmount] = useState('')
+  const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
 
@@ -25,10 +35,10 @@ export default function AdsSpendForm({ onDone, onToast }) {
     }
 
     setBusy(true)
-    // upsert เพราะมี unique constraint (store_id, period_month) — คีย์ซ้ำเดือนเดิมจะอัปเดตทับ
-    const { error } = await supabase.from('ads_spend').upsert(
-      { store_id: storeId, period_month: periodMonth, amount: Number(amount) },
-      { onConflict: 'store_id,period_month' }
+    // upsert เพราะมี unique constraint (store_id, week_ending) — คีย์ซ้ำสัปดาห์เดิมจะอัปเดตทับ (ไว้แก้ไขยอดย้อนหลังได้)
+    const { error } = await supabase.from('ads_spend_weekly').upsert(
+      { store_id: storeId, week_ending: weekEnding, amount: Number(amount), note: note || null },
+      { onConflict: 'store_id,week_ending' }
     )
 
     if (error) {
@@ -37,6 +47,7 @@ export default function AdsSpendForm({ onDone, onToast }) {
     } else {
       setMsg(null)
       setAmount('')
+      setNote('')
       onDone?.()
       onToast?.({ type: 'ok', text: 'บันทึกค่าโฆษณาแล้ว' })
     }
@@ -45,7 +56,7 @@ export default function AdsSpendForm({ onDone, onToast }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 bg-slate-800 rounded-xl p-4 border border-slate-700">
-      <h3 className="text-sm font-semibold text-slate-200">คีย์ค่าโฆษณารายเดือน</h3>
+      <h3 className="text-sm font-semibold text-slate-200">คีย์ค่าโฆษณารายสัปดาห์</h3>
 
       <Select
         label="ร้าน"
@@ -56,19 +67,26 @@ export default function AdsSpendForm({ onDone, onToast }) {
       />
 
       <Input
-        label="เดือน"
-        type="month"
-        value={periodMonth.slice(0, 7)}
-        onChange={(e) => setPeriodMonth(e.target.value + '-01')}
+        label="สัปดาห์ที่สิ้นสุดวันที่"
+        type="date"
+        value={weekEnding}
+        onChange={(e) => setWeekEnding(e.target.value)}
       />
 
       <Input
-        label="ยอดค่าโฆษณา (บาท)"
+        label="ยอดค่าโฆษณาสัปดาห์นี้ (บาท)"
         type="number"
         step="0.01"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
-        placeholder="เช่น 3500"
+        placeholder="เช่น 850"
+      />
+
+      <Input
+        label="หมายเหตุ (ถ้ามี)"
+        type="text"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
       />
 
       {msg && (

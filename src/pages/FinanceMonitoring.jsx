@@ -13,8 +13,12 @@ function tooltipStyle() {
   }
 }
 
+const STORE_COLORS = ['#38bdf8', '#a78bfa', '#f472b6', '#fb923c', '#4ade80', '#facc15', '#f87171', '#94a3b8']
+
 export default function FinanceMonitoring({ onBack }) {
   const [monthly, setMonthly] = useState([])
+  const [adsByStore, setAdsByStore] = useState([])
+  const [storeKeys, setStoreKeys] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [exportBusy, setExportBusy] = useState('')
@@ -24,16 +28,34 @@ export default function FinanceMonitoring({ onBack }) {
       setLoading(true)
       // รายได้+กำไรรายเดือน รวมทั้งข้อมูลปัจจุบัน (movements/payouts) และย้อนหลังที่นำเข้า (historical_sales)
       // นับตามวันที่ขายออกจริง
-      const { data, error } = await supabase
-        .from('monthly_revenue_profit_unified')
-        .select('*')
-        .order('month', { ascending: true })
-        .limit(24)
-      if (error) setError(error.message)
-      setMonthly((data || []).map((m) => ({
+      const [plRes, adsRes] = await Promise.all([
+        supabase.from('monthly_revenue_profit_unified').select('*').order('month', { ascending: true }).limit(24),
+        supabase.from('monthly_ads_by_store').select('*').order('month', { ascending: true }),
+      ])
+      if (plRes.error) setError(plRes.error.message)
+      setMonthly((plRes.data || []).map((m) => ({
         ...m,
         monthLabel: new Date(m.month).toLocaleDateString('th-TH', { month: 'short', year: '2-digit' }),
       })))
+
+      // pivot ค่าโฆษณารายเดือน-ต่อร้าน ให้เป็นแถวเดียวต่อเดือน มีคอลัมน์แยกตามชื่อร้าน (สำหรับกราฟแยกร้าน)
+      const stores = [...new Set((adsRes.data || []).map((r) => r.store_name))]
+      const byMonth = new Map()
+      for (const r of adsRes.data || []) {
+        if (!byMonth.has(r.month)) {
+          byMonth.set(r.month, {
+            month: r.month,
+            monthLabel: new Date(r.month).toLocaleDateString('th-TH', { month: 'short', year: '2-digit' }),
+            total: 0,
+          })
+        }
+        const row = byMonth.get(r.month)
+        row[r.store_name] = Number(r.amount)
+        row.total += Number(r.amount)
+      }
+      setAdsByStore([...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month)))
+      setStoreKeys(stores)
+
       setLoading(false)
     }
     load()
@@ -80,6 +102,25 @@ export default function FinanceMonitoring({ onBack }) {
     setExportBusy('')
   }
 
+  async function exportAdsSpend() {
+    setExportBusy('ads')
+    const { data, error } = await supabase
+      .from('ads_spend_weekly')
+      .select('week_ending, amount, note, stores(name)')
+      .order('week_ending', { ascending: false })
+    if (error) {
+      alert('ดึงข้อมูลไม่สำเร็จ: ' + error.message)
+    } else {
+      exportToCsv(`ค่าโฆษณารายสัปดาห์_${todayStamp()}.csv`, (data || []).map((r) => ({
+        สัปดาห์ที่สิ้นสุด: r.week_ending,
+        ร้าน: r.stores?.name || '',
+        ยอดค่าโฆษณา: r.amount,
+        หมายเหตุ: r.note || '',
+      })))
+    }
+    setExportBusy('')
+  }
+
   const totalRevenue = monthly.reduce((s, m) => s + Number(m.revenue || 0), 0)
   const totalProfit = monthly.reduce((s, m) => s + Number(m.profit || 0), 0)
 
@@ -116,6 +157,13 @@ export default function FinanceMonitoring({ onBack }) {
               className="text-sm py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition disabled:opacity-50 text-left px-3"
             >
               {exportBusy === 'pl' ? 'กำลังเตรียมไฟล์...' : '📋 กำไรขาดทุนละเอียด (COGS/Ads แยก — เฉพาะข้อมูลปัจจุบัน)'}
+            </button>
+            <button
+              onClick={exportAdsSpend}
+              disabled={exportBusy !== ''}
+              className="text-sm py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition disabled:opacity-50 text-left px-3"
+            >
+              {exportBusy === 'ads' ? 'กำลังเตรียมไฟล์...' : '📣 ค่าโฆษณารายสัปดาห์ทั้งหมด'}
             </button>
           </div>
         </section>
@@ -183,6 +231,57 @@ export default function FinanceMonitoring({ onBack }) {
                   </div>
                 </div>
               ))}
+            </section>
+
+            {/* ค่าโฆษณารายเดือน แยกตามร้าน */}
+            <section className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+              <h2 className="text-sm font-semibold text-slate-200">ค่าโฆษณารายเดือน แยกตามร้าน</h2>
+              <p className="text-xs text-slate-500 mb-2">รวมจากยอดที่คีย์รายสัปดาห์ทุกสุดสัปดาห์</p>
+              <div style={{ width: '100%', height: 260 }}>
+                {adsByStore.length === 0 ? (
+                  <p className="text-slate-500 text-sm">ยังไม่มีข้อมูลค่าโฆษณา — เริ่มคีย์ได้ที่หน้าคีย์ข้อมูล → ค่าโฆษณา</p>
+                ) : (
+                  <ResponsiveContainer>
+                    <BarChart data={adsByStore} margin={{ left: 8, right: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                      <XAxis dataKey="monthLabel" stroke="#94a3b8" fontSize={11} />
+                      <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                      <Tooltip
+                        contentStyle={tooltipStyle()}
+                        formatter={(value, name) => [`${Number(value).toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท`, name]}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      {storeKeys.map((name, i) => (
+                        <Bar key={name} dataKey={name} stackId="ads" fill={STORE_COLORS[i % STORE_COLORS.length]} radius={i === storeKeys.length - 1 ? [3, 3, 0, 0] : undefined} />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </section>
+
+            {/* ค่าโฆษณารายเดือน รวมทุกร้าน */}
+            <section className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+              <h2 className="text-sm font-semibold text-slate-200">ค่าโฆษณารายเดือน รวมทุกร้าน</h2>
+              <p className="text-xs text-slate-500 mb-2">ยอดรวมทั้งหมดต่อเดือน ไม่แยกร้าน</p>
+              <div style={{ width: '100%', height: 220 }}>
+                {adsByStore.length === 0 ? (
+                  <p className="text-slate-500 text-sm">ยังไม่มีข้อมูลค่าโฆษณา</p>
+                ) : (
+                  <ResponsiveContainer>
+                    <BarChart data={adsByStore} margin={{ left: 8, right: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                      <XAxis dataKey="monthLabel" stroke="#94a3b8" fontSize={11} />
+                      <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                      <Tooltip
+                        contentStyle={tooltipStyle()}
+                        formatter={(value) => [`${Number(value).toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท`, 'ค่าโฆษณารวม']}
+                      />
+                      <Bar dataKey="total" fill="#fb923c" radius={[3, 3, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
             </section>
           </>
         )}

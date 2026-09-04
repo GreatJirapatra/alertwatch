@@ -26,8 +26,8 @@ export default function AdsSpendHistory({ onToast }) {
     else setLoadingMore(true)
 
     const { data, error } = await supabase
-      .from('ads_spend')
-      .select('id, store_id, period_month, amount, created_at, stores(name, kind)')
+      .from('ads_spend_weekly')
+      .select('id, store_id, week_ending, amount, note, created_at, stores(name, kind)')
       .order('created_at', { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1)
 
@@ -48,8 +48,9 @@ export default function AdsSpendHistory({ onToast }) {
     setEditingId(row.id)
     setDraft({
       store_id: row.store_id,
-      period_month: row.period_month,
+      week_ending: row.week_ending,
       amount: String(row.amount),
+      note: row.note || '',
     })
   }
 
@@ -65,16 +66,17 @@ export default function AdsSpendHistory({ onToast }) {
     }
     setSavingId(id)
     const { error } = await supabase
-      .from('ads_spend')
+      .from('ads_spend_weekly')
       .update({
         store_id: draft.store_id,
-        period_month: draft.period_month,
+        week_ending: draft.week_ending,
         amount: Number(draft.amount),
+        note: draft.note || null,
       })
       .eq('id', id)
 
     if (error) {
-      // ชนกับ unique constraint (store_id, period_month) ถ้าเดือน/ร้านซ้ำกับรายการอื่น
+      // ชนกับ unique constraint (store_id, week_ending) ถ้าสัปดาห์/ร้านซ้ำกับรายการอื่น
       onToast?.({ type: 'error', text: 'บันทึกไม่สำเร็จ: ' + error.message })
     } else {
       onToast?.({ type: 'ok', text: 'แก้ไขรายการแล้ว' })
@@ -86,7 +88,7 @@ export default function AdsSpendHistory({ onToast }) {
 
   async function handleDelete(id) {
     setDeletingId(id)
-    const { error } = await supabase.from('ads_spend').delete().eq('id', id)
+    const { error } = await supabase.from('ads_spend_weekly').delete().eq('id', id)
     if (error) {
       onToast?.({ type: 'error', text: 'ลบไม่สำเร็จ: ' + error.message })
     } else {
@@ -118,10 +120,10 @@ export default function AdsSpendHistory({ onToast }) {
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <Input
-                    label="เดือน"
-                    type="month"
-                    value={draft.period_month.slice(0, 7)}
-                    onChange={(e) => setDraft((d) => ({ ...d, period_month: e.target.value + '-01' }))}
+                    label="สัปดาห์ที่สิ้นสุดวันที่"
+                    type="date"
+                    value={draft.week_ending}
+                    onChange={(e) => setDraft((d) => ({ ...d, week_ending: e.target.value }))}
                   />
                   <Input
                     label="ยอดค่าโฆษณา (บาท)"
@@ -131,6 +133,12 @@ export default function AdsSpendHistory({ onToast }) {
                     onChange={(e) => setDraft((d) => ({ ...d, amount: e.target.value }))}
                   />
                 </div>
+                <Input
+                  label="หมายเหตุ"
+                  type="text"
+                  value={draft.note}
+                  onChange={(e) => setDraft((d) => ({ ...d, note: e.target.value }))}
+                />
                 <div className="flex items-center gap-2 pt-1">
                   <button
                     onClick={() => saveEdit(row.id)}
@@ -157,7 +165,8 @@ export default function AdsSpendHistory({ onToast }) {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
-                    {new Date(row.period_month).toLocaleDateString('th-TH', { year: 'numeric', month: 'long' })}
+                    สัปดาห์สิ้นสุด {row.week_ending}
+                    {row.note && ` · ${row.note}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
