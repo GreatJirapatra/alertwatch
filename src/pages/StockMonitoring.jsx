@@ -35,9 +35,13 @@ function tooltipStyle() {
     border: '1px solid #334155',
     borderRadius: 8,
     fontSize: 12,
-    color: '#e2e8f0',
+    color: '#ffffff',
   }
 }
+
+// Recharts ไม่ไล่สีจาก contentStyle ลงไปที่ label/item เอง ต้องกำหนดแยกให้อ่านออกบนพื้นหลังเข้ม
+const tooltipLabelStyle = { color: '#ffffff', fontWeight: 600 }
+const tooltipItemStyle = { color: '#ffffff' }
 
 export default function StockMonitoring({ onBack }) {
   const [stock, setStock] = useState([])
@@ -296,7 +300,7 @@ export default function StockMonitoring({ onBack }) {
                   <XAxis type="number" stroke="#64748b" fontSize={11} />
                   <YAxis type="category" dataKey="code" stroke="#94a3b8" fontSize={11} width={90} />
                   <Tooltip
-                    contentStyle={tooltipStyle()}
+                    contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
                     formatter={(value, _name, props) => [`${value} ชิ้น`, props.payload.name]}
                   />
                   <Bar dataKey="on_hand" radius={[0, 4, 4, 0]}>
@@ -324,7 +328,7 @@ export default function StockMonitoring({ onBack }) {
                   <XAxis type="number" stroke="#64748b" fontSize={11} />
                   <YAxis type="category" dataKey="code" stroke="#94a3b8" fontSize={11} width={90} />
                   <Tooltip
-                    contentStyle={tooltipStyle()}
+                    contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
                     formatter={(value, _name, props) => [
                       value == null ? 'ไม่เคลื่อนไหวเลย' : `${value} วัน`,
                       `${props.payload.name} · เงินจม ${Number(props.payload.capital_value).toLocaleString('th-TH')} บาท`,
@@ -361,7 +365,7 @@ export default function StockMonitoring({ onBack }) {
                       <Cell key={i} fill={STORE_COLORS[i % STORE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={tooltipStyle()} formatter={(value) => [`${value} ชิ้น`]} />
+                  <Tooltip contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} formatter={(value) => [`${value} ชิ้น`]} />
                   <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} />
                 </PieChart>
               </ResponsiveContainer>
@@ -405,7 +409,7 @@ export default function StockMonitoring({ onBack }) {
                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
                       <XAxis type="number" stroke="#64748b" fontSize={11} />
                       <YAxis type="category" dataKey="name" stroke="#94a3b8" fontSize={11} width={90} />
-                      <Tooltip contentStyle={tooltipStyle()} formatter={(value) => [`${value} ชิ้น`, 'ขายแล้ว']} />
+                      <Tooltip contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} formatter={(value) => [`${value} ชิ้น`, 'ขายแล้ว']} />
                       <Bar dataKey="units" fill="#38bdf8" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -462,7 +466,7 @@ export default function StockMonitoring({ onBack }) {
                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
                       <XAxis type="number" stroke="#64748b" fontSize={11} />
                       <YAxis type="category" dataKey="province" stroke="#94a3b8" fontSize={11} width={90} />
-                      <Tooltip contentStyle={tooltipStyle()} formatter={(value) => [`${value} ชิ้น`, 'ขายแล้ว']} />
+                      <Tooltip contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} formatter={(value) => [`${value} ชิ้น`, 'ขายแล้ว']} />
                       <Bar dataKey="units" fill="#a78bfa" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>

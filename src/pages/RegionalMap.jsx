@@ -217,7 +217,9 @@ export default function RegionalMap({ onBack }) {
                       <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
                       <YAxis stroke="#64748b" fontSize={11} />
                       <Tooltip
-                        contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
+                        contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12, color: '#ffffff' }}
+                          labelStyle={{ color: '#ffffff', fontWeight: 600 }}
+                          itemStyle={{ color: '#ffffff' }}
                         formatter={(value) => [`${value} ชิ้น`, 'ขายแล้ว']}
                       />
                       <Bar dataKey="value" fill="#2dd4bf" radius={[4, 4, 0, 0]} />

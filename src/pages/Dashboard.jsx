@@ -290,7 +290,9 @@ export default function Dashboard({ onNavigateDataEntry, onNavigateStockMonitori
                         />
                         <YAxis stroke="#64748b" fontSize={10} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
                         <Tooltip
-                          contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
+                          contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12, color: '#ffffff' }}
+                          labelStyle={{ color: '#ffffff', fontWeight: 600 }}
+                          itemStyle={{ color: '#ffffff' }}
                           labelFormatter={(m) => new Date(m).toLocaleDateString('th-TH', { year: 'numeric', month: 'long' })}
                           formatter={(value, name) => [`${Number(value).toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท`, name]}
                         />

@@ -9,9 +9,13 @@ function tooltipStyle() {
     border: '1px solid #334155',
     borderRadius: 8,
     fontSize: 12,
-    color: '#e2e8f0',
+    color: '#ffffff',
   }
 }
+
+// Recharts ไม่ไล่สีจาก contentStyle ลงไปที่ label/item เอง ต้องกำหนดแยกให้อ่านออกบนพื้นหลังเข้ม
+const tooltipLabelStyle = { color: '#ffffff', fontWeight: 600 }
+const tooltipItemStyle = { color: '#ffffff' }
 
 const STORE_COLORS = ['#38bdf8', '#a78bfa', '#f472b6', '#fb923c', '#4ade80', '#facc15', '#f87171', '#94a3b8']
 
@@ -200,7 +204,7 @@ export default function FinanceMonitoring({ onBack }) {
                     <XAxis dataKey="monthLabel" stroke="#94a3b8" fontSize={11} />
                     <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
                     <Tooltip
-                      contentStyle={tooltipStyle()}
+                      contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
                       formatter={(value, name) => [`${Number(value).toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท`, name]}
                     />
                     <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => (v === 'revenue' ? 'รายได้' : 'กำไร')} />
@@ -247,7 +251,7 @@ export default function FinanceMonitoring({ onBack }) {
                       <XAxis dataKey="monthLabel" stroke="#94a3b8" fontSize={11} />
                       <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
                       <Tooltip
-                        contentStyle={tooltipStyle()}
+                        contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
                         formatter={(value, name) => [`${Number(value).toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท`, name]}
                       />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -274,7 +278,7 @@ export default function FinanceMonitoring({ onBack }) {
                       <XAxis dataKey="monthLabel" stroke="#94a3b8" fontSize={11} />
                       <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
                       <Tooltip
-                        contentStyle={tooltipStyle()}
+                        contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
                         formatter={(value) => [`${Number(value).toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท`, 'ค่าโฆษณารวม']}
                       />
                       <Bar dataKey="total" fill="#fb923c" radius={[3, 3, 0, 0]} />
