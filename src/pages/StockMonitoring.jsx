@@ -103,15 +103,12 @@ export default function StockMonitoring({ onBack }) {
       setProvinceLoading(true)
 
       let query = supabase
-        .from('province_sales_unified')
-        .select('qty, customer_province')
+        .from('province_sales_agg')
+        .select('customer_province, units')
 
       if (provinceSku) query = query.eq('sku_id', provinceSku)
       if (provinceMonth !== 'all') {
-        const [y, m] = provinceMonth.split('-').map(Number)
-        const start = `${provinceMonth}-01`
-        const end = new Date(y, m, 0).toISOString().slice(0, 10)
-        query = query.gte('sold_on', start).lte('sold_on', end)
+        query = query.eq('month', `${provinceMonth}-01`)
       }
 
       const { data, error } = await query
@@ -123,7 +120,7 @@ export default function StockMonitoring({ onBack }) {
 
       const unitsByProvince = {}
       for (const m of data || []) {
-        unitsByProvince[m.customer_province] = (unitsByProvince[m.customer_province] || 0) + Math.abs(m.qty)
+        unitsByProvince[m.customer_province] = (unitsByProvince[m.customer_province] || 0) + Number(m.units)
       }
       const arr = Object.entries(unitsByProvince)
         .map(([province, units]) => ({ province, units }))
@@ -184,9 +181,9 @@ export default function StockMonitoring({ onBack }) {
     setExportBusy('province')
     const [salesRes, skuRes] = await Promise.all([
       supabase
-        .from('province_sales_unified')
-        .select('sold_on, qty, customer_province, sku_id')
-        .order('sold_on', { ascending: false }),
+        .from('province_sales_agg')
+        .select('month, sku_id, customer_province, units')
+        .order('month', { ascending: false }),
       supabase.from('skus').select('id, code, name'),
     ])
 
@@ -194,23 +191,18 @@ export default function StockMonitoring({ onBack }) {
       alert('ดึงข้อมูลไม่สำเร็จ: ' + salesRes.error.message)
     } else {
       const skuMap = new Map((skuRes.data || []).map((s) => [s.id, s]))
-      const map = new Map()
-      for (const r of salesRes.data || []) {
-        const month = r.sold_on.slice(0, 7)
-        const sku = skuMap.get(r.sku_id)
-        const key = `${sku?.code}|${r.customer_province}|${month}`
-        if (!map.has(key)) {
-          map.set(key, {
-            เดือน: month,
+      const rows = (salesRes.data || [])
+        .map((r) => {
+          const sku = skuMap.get(r.sku_id)
+          return {
+            เดือน: r.month.slice(0, 7),
             รหัสสินค้า: sku?.code || '',
             ชื่อสินค้า: sku?.name || '',
             จังหวัด: r.customer_province,
-            ปริมาณ_ชิ้น: 0,
-          })
-        }
-        map.get(key).ปริมาณ_ชิ้น += Math.abs(r.qty)
-      }
-      const rows = [...map.values()].sort((a, b) => {
+            ปริมาณ_ชิ้น: Number(r.units),
+          }
+        })
+        .sort((a, b) => {
         if (a.เดือน !== b.เดือน) return b.เดือน.localeCompare(a.เดือน)
         if (a.รหัสสินค้า !== b.รหัสสินค้า) return a.รหัสสินค้า.localeCompare(b.รหัสสินค้า)
         return b.ปริมาณ_ชิ้น - a.ปริมาณ_ชิ้น

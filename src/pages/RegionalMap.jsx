@@ -52,7 +52,7 @@ export default function RegionalMap({ onBack }) {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      let query = supabase.from('province_sales_unified').select('sold_on, qty, customer_province, sku_id')
+      let query = supabase.from('province_sales_agg').select('month, sku_id, customer_province, units')
       if (selectedSku) query = query.eq('sku_id', selectedSku)
       const { data } = await query
       setRows(data || [])
@@ -64,18 +64,18 @@ export default function RegionalMap({ onBack }) {
   // เปลี่ยน SKU แล้วรีเซ็ตตัวกรองฤดูกาล กันค้างฤดูเดิมไว้โดยไม่ตั้งใจ
   useEffect(() => { setSelectedSeason('') }, [selectedSku])
 
-  function seasonOf(sold_on) {
-    return MONTH_TO_SEASON[Number(sold_on.slice(5, 7))]
+  function seasonOf(monthStr) {
+    return MONTH_TO_SEASON[Number(monthStr.slice(5, 7))]
   }
 
   // แผนที่ภาค — กรองตามฤดูที่เลือกด้วย (ถ้าเลือกไว้)
   const regionTotals = useMemo(() => {
     const totals = {}
     for (const r of rows) {
-      if (selectedSeason && seasonOf(r.sold_on) !== selectedSeason) continue
+      if (selectedSeason && seasonOf(r.month) !== selectedSeason) continue
       const region = PROVINCE_TO_REGION[r.customer_province]
       if (!region) continue
-      totals[region] = (totals[region] || 0) + Math.abs(r.qty)
+      totals[region] = (totals[region] || 0) + Number(r.units)
     }
     return totals
   }, [rows, selectedSeason])
@@ -86,8 +86,8 @@ export default function RegionalMap({ onBack }) {
   const seasonChartData = useMemo(() => {
     const totals = { summer: 0, rainy: 0, winter: 0 }
     for (const r of rows) {
-      const season = seasonOf(r.sold_on)
-      if (season) totals[season] += Math.abs(r.qty)
+      const season = seasonOf(r.month)
+      if (season) totals[season] += Number(r.units)
     }
     return SEASONS.map((s) => ({ label: s.label.split(' ')[0], value: totals[s.key] }))
   }, [rows])
@@ -99,9 +99,9 @@ export default function RegionalMap({ onBack }) {
     for (const r of REGIONS) matrix[r.key] = { summer: 0, rainy: 0, winter: 0 }
     for (const row of rows) {
       const region = PROVINCE_TO_REGION[row.customer_province]
-      const season = seasonOf(row.sold_on)
+      const season = seasonOf(row.month)
       if (!region || !season) continue
-      matrix[region][season] += Math.abs(row.qty)
+      matrix[region][season] += Number(row.units)
     }
     return matrix
   }, [rows, selectedSku])
@@ -112,11 +112,11 @@ export default function RegionalMap({ onBack }) {
     const skuMap = new Map(skus.map((s) => [s.id, s]))
     const bucket = { summer: new Map(), rainy: new Map(), winter: new Map() }
     for (const r of rows) {
-      const month = Number(r.sold_on.slice(5, 7))
+      const month = Number(r.month.slice(5, 7))
       const season = MONTH_TO_SEASON[month]
       if (!season) continue
       const m = bucket[season]
-      m.set(r.sku_id, (m.get(r.sku_id) || 0) + Math.abs(r.qty))
+      m.set(r.sku_id, (m.get(r.sku_id) || 0) + Number(r.units))
     }
     const result = {}
     for (const s of SEASONS) {

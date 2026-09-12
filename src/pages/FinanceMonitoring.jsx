@@ -193,15 +193,16 @@ export default function FinanceMonitoring({ onBack }) {
       setLoading(true)
       const [skuRes, rpRes, costRes, plRes, adsRes] = await Promise.all([
         supabase.from('skus').select('id, code, name').order('code'),
-        supabase.from('sku_revenue_profit_unified').select('date, sku_id, revenue, profit'),
-        supabase.from('sku_stock_in_cost').select('date, sku_id, cost'),
+        supabase.from('sku_monthly_finance').select('month, sku_id, revenue, profit'),
+        supabase.from('sku_monthly_cost').select('month, sku_id, cost'),
         supabase.from('monthly_revenue_profit_unified').select('*').order('month', { ascending: true }).limit(24),
         supabase.from('monthly_ads_by_store').select('*').order('month', { ascending: true }),
       ])
       if (rpRes.error) setError(rpRes.error.message)
       setSkus(skuRes.data || [])
-      setRevenueProfitRows(rpRes.data || [])
-      setCostRows(costRes.data || [])
+      // เปลี่ยนชื่อฟิลด์ month -> date ให้ตรงกับที่ฟังก์ชัน aggregate ด้านบนคาดไว้ (ข้อมูลเป็นรายเดือนอยู่แล้วจากฝั่ง DB)
+      setRevenueProfitRows((rpRes.data || []).map((r) => ({ ...r, date: r.month })))
+      setCostRows((costRes.data || []).map((r) => ({ ...r, date: r.month })))
       setMonthly((plRes.data || []).map((m) => ({ ...m, monthLabel: monthLabelOf(m.month) })))
 
       const stores = [...new Set((adsRes.data || []).map((r) => r.store_name))]
