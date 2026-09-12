@@ -9,6 +9,7 @@ const KIND_OPTIONS = [
   { value: 'out', label: 'ขายออก' },
   { value: 'return', label: 'ตีกลับ' },
   { value: 'adjust', label: 'ปรับปรุงยอด' },
+  { value: 'lost', label: 'ของหาย/ส่งเกิน' },
 ]
 const KIND_LABEL = Object.fromEntries(KIND_OPTIONS.map((k) => [k.value, k.label]))
 
@@ -218,7 +219,7 @@ export default function MovementHistory({ onToast }) {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium">{row.skus?.code} — {row.skus?.name}</span>
-                    <span className={`text-[11px] px-1.5 py-0.5 rounded ${row.kind === 'out' ? 'bg-red-500/20 text-red-400' : 'bg-teal-500/20 text-teal-400'}`}>
+                    <span className={`text-[11px] px-1.5 py-0.5 rounded ${row.kind === 'out' || row.kind === 'lost' ? 'bg-red-500/20 text-red-400' : 'bg-teal-500/20 text-teal-400'}`}>
                       {KIND_LABEL[row.kind]} {row.qty > 0 ? `+${row.qty}` : row.qty}
                     </span>
                   </div>

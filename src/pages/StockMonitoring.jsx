@@ -164,7 +164,7 @@ export default function StockMonitoring({ onBack }) {
     if (error) {
       alert('ดึงข้อมูลไม่สำเร็จ: ' + error.message)
     } else {
-      const kindLabel = { in: 'รับเข้า', out: 'ขายออก', return: 'ตีกลับ', adjust: 'ปรับปรุงยอด' }
+      const kindLabel = { in: 'รับเข้า', out: 'ขายออก', return: 'ตีกลับ', adjust: 'ปรับปรุงยอด', lost: 'ของหาย/ส่งเกิน' }
       exportToCsv(`รายการเคลื่อนไหวสต๊อก_${todayStamp()}.csv`, (data || []).map((r) => ({
         วันที่: r.moved_on,
         ประเภท: kindLabel[r.kind] || r.kind,

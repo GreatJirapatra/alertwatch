@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
 import { supabase } from '../lib/supabase'
 import { exportToCsv, todayStamp } from '../lib/csvExport'
+import { Select } from '../components/FormFields'
 
 function tooltipStyle() {
   return {
@@ -13,13 +14,97 @@ function tooltipStyle() {
   }
 }
 
-// Recharts ไม่ไล่สีจาก contentStyle ลงไปที่ label/item เอง ต้องกำหนดแยกให้อ่านออกบนพื้นหลังเข้ม
 const tooltipLabelStyle = { color: '#ffffff', fontWeight: 600 }
 const tooltipItemStyle = { color: '#ffffff' }
 
 const STORE_COLORS = ['#38bdf8', '#a78bfa', '#f472b6', '#fb923c', '#4ade80', '#facc15', '#f87171', '#94a3b8']
 
+function monthLabelOf(monthStr) {
+  return new Date(monthStr).toLocaleDateString('th-TH', { month: 'short', year: '2-digit' })
+}
+
+function aggregateMonthly(rows, valueKey) {
+  const map = new Map()
+  for (const r of rows) {
+    const month = r.date.slice(0, 7) + '-01'
+    map.set(month, (map.get(month) || 0) + Number(r[valueKey] || 0))
+  }
+  return [...map.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([month, value]) => ({ month, monthLabel: monthLabelOf(month), value }))
+}
+
+function aggregateAnnual(rows, valueKey) {
+  const map = new Map()
+  for (const r of rows) {
+    const year = r.date.slice(0, 4)
+    map.set(year, (map.get(year) || 0) + Number(r[valueKey] || 0))
+  }
+  return [...map.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([year, value]) => ({ year, value }))
+}
+
+function MetricChartPair({ title, subtitle, monthlyData, annualData, color, unit, colorByValue, emptyText }) {
+  const isEmpty = monthlyData.length === 0
+  return (
+    <section className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+      <h2 className="text-sm font-semibold text-slate-200">{title}</h2>
+      {subtitle && <p className="text-xs text-slate-500 mb-2">{subtitle}</p>}
+      {isEmpty ? (
+        <p className="text-slate-500 text-sm py-4">{emptyText || 'ยังไม่มีข้อมูล'}</p>
+      ) : (
+        <>
+          <p className="text-xs text-slate-400 mt-2 mb-1">รายเดือน</p>
+          <div style={{ width: '100%', height: 200 }}>
+            <ResponsiveContainer>
+              <BarChart data={monthlyData} margin={{ left: 8, right: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                <XAxis dataKey="monthLabel" stroke="#94a3b8" fontSize={10} />
+                <YAxis stroke="#64748b" fontSize={10} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                <Tooltip
+                  contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
+                  formatter={(value) => [`${Number(value).toLocaleString('th-TH', { maximumFractionDigits: 0 })} ${unit}`, title]}
+                />
+                <Bar dataKey="value" radius={[3, 3, 0, 0]}>
+                  {monthlyData.map((d, i) => (
+                    <Cell key={i} fill={colorByValue ? (d.value >= 0 ? color : '#ef4444') : color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <p className="text-xs text-slate-400 mt-3 mb-1">รายปี</p>
+          <div style={{ width: '100%', height: 160 }}>
+            <ResponsiveContainer>
+              <BarChart data={annualData} margin={{ left: 8, right: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                <XAxis dataKey="year" stroke="#94a3b8" fontSize={11} />
+                <YAxis stroke="#64748b" fontSize={10} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                <Tooltip
+                  contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
+                  formatter={(value) => [`${Number(value).toLocaleString('th-TH', { maximumFractionDigits: 0 })} ${unit}`, title]}
+                />
+                <Bar dataKey="value" radius={[3, 3, 0, 0]}>
+                  {annualData.map((d, i) => (
+                    <Cell key={i} fill={colorByValue ? (d.value >= 0 ? color : '#ef4444') : color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
+    </section>
+  )
+}
+
 export default function FinanceMonitoring({ onBack }) {
+  const [skus, setSkus] = useState([])
+  const [selectedSku, setSelectedSku] = useState('')
+  const [revenueProfitRows, setRevenueProfitRows] = useState([])
+  const [costRows, setCostRows] = useState([])
   const [monthly, setMonthly] = useState([])
   const [adsByStore, setAdsByStore] = useState([])
   const [storeKeys, setStoreKeys] = useState([])
@@ -30,28 +115,24 @@ export default function FinanceMonitoring({ onBack }) {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      // รายได้+กำไรรายเดือน รวมทั้งข้อมูลปัจจุบัน (movements/payouts) และย้อนหลังที่นำเข้า (historical_sales)
-      // นับตามวันที่ขายออกจริง
-      const [plRes, adsRes] = await Promise.all([
+      const [skuRes, rpRes, costRes, plRes, adsRes] = await Promise.all([
+        supabase.from('skus').select('id, code, name').order('code'),
+        supabase.from('sku_revenue_profit_unified').select('date, sku_id, revenue, profit'),
+        supabase.from('sku_stock_in_cost').select('date, sku_id, cost'),
         supabase.from('monthly_revenue_profit_unified').select('*').order('month', { ascending: true }).limit(24),
         supabase.from('monthly_ads_by_store').select('*').order('month', { ascending: true }),
       ])
-      if (plRes.error) setError(plRes.error.message)
-      setMonthly((plRes.data || []).map((m) => ({
-        ...m,
-        monthLabel: new Date(m.month).toLocaleDateString('th-TH', { month: 'short', year: '2-digit' }),
-      })))
+      if (rpRes.error) setError(rpRes.error.message)
+      setSkus(skuRes.data || [])
+      setRevenueProfitRows(rpRes.data || [])
+      setCostRows(costRes.data || [])
+      setMonthly((plRes.data || []).map((m) => ({ ...m, monthLabel: monthLabelOf(m.month) })))
 
-      // pivot ค่าโฆษณารายเดือน-ต่อร้าน ให้เป็นแถวเดียวต่อเดือน มีคอลัมน์แยกตามชื่อร้าน (สำหรับกราฟแยกร้าน)
       const stores = [...new Set((adsRes.data || []).map((r) => r.store_name))]
       const byMonth = new Map()
       for (const r of adsRes.data || []) {
         if (!byMonth.has(r.month)) {
-          byMonth.set(r.month, {
-            month: r.month,
-            monthLabel: new Date(r.month).toLocaleDateString('th-TH', { month: 'short', year: '2-digit' }),
-            total: 0,
-          })
+          byMonth.set(r.month, { month: r.month, monthLabel: monthLabelOf(r.month), total: 0 })
         }
         const row = byMonth.get(r.month)
         row[r.store_name] = Number(r.amount)
@@ -64,6 +145,22 @@ export default function FinanceMonitoring({ onBack }) {
     }
     load()
   }, [])
+
+  const filteredRP = useMemo(
+    () => (selectedSku ? revenueProfitRows.filter((r) => r.sku_id === selectedSku) : revenueProfitRows),
+    [revenueProfitRows, selectedSku]
+  )
+  const filteredCost = useMemo(
+    () => (selectedSku ? costRows.filter((r) => r.sku_id === selectedSku) : costRows),
+    [costRows, selectedSku]
+  )
+
+  const revenueMonthly = useMemo(() => aggregateMonthly(filteredRP, 'revenue'), [filteredRP])
+  const revenueAnnual = useMemo(() => aggregateAnnual(filteredRP, 'revenue'), [filteredRP])
+  const profitMonthly = useMemo(() => aggregateMonthly(filteredRP, 'profit'), [filteredRP])
+  const profitAnnual = useMemo(() => aggregateAnnual(filteredRP, 'profit'), [filteredRP])
+  const costMonthly = useMemo(() => aggregateMonthly(filteredCost, 'cost'), [filteredCost])
+  const costAnnual = useMemo(() => aggregateAnnual(filteredCost, 'cost'), [filteredCost])
 
   async function exportMonthlyRevenue() {
     setExportBusy('revenue')
@@ -125,8 +222,29 @@ export default function FinanceMonitoring({ onBack }) {
     setExportBusy('')
   }
 
+  async function exportStockInCost() {
+    setExportBusy('cost')
+    const { data, error } = await supabase
+      .from('sku_stock_in_cost')
+      .select('date, qty, cost, skus(code, name)')
+      .order('date', { ascending: false })
+    if (error) {
+      alert('ดึงข้อมูลไม่สำเร็จ: ' + error.message)
+    } else {
+      exportToCsv(`ต้นทุนสต๊อกที่นำเข้า_${todayStamp()}.csv`, (data || []).map((r) => ({
+        วันที่รับเข้า: r.date,
+        รหัสสินค้า: r.skus?.code || '',
+        ชื่อสินค้า: r.skus?.name || '',
+        จำนวนชิ้น: r.qty,
+        ต้นทุนรวม: r.cost,
+      })))
+    }
+    setExportBusy('')
+  }
+
   const totalRevenue = monthly.reduce((s, m) => s + Number(m.revenue || 0), 0)
   const totalProfit = monthly.reduce((s, m) => s + Number(m.profit || 0), 0)
+  const skuLabel = selectedSku ? skus.find((s) => s.id === selectedSku)?.name : 'ทุกสินค้ารวมกัน'
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
@@ -163,6 +281,13 @@ export default function FinanceMonitoring({ onBack }) {
               {exportBusy === 'pl' ? 'กำลังเตรียมไฟล์...' : '📋 กำไรขาดทุนละเอียด (COGS/Ads แยก — เฉพาะข้อมูลปัจจุบัน)'}
             </button>
             <button
+              onClick={exportStockInCost}
+              disabled={exportBusy !== ''}
+              className="text-sm py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition disabled:opacity-50 text-left px-3"
+            >
+              {exportBusy === 'cost' ? 'กำลังเตรียมไฟล์...' : '📦 ต้นทุนสต๊อกที่นำเข้าทั้งหมด'}
+            </button>
+            <button
               onClick={exportAdsSpend}
               disabled={exportBusy !== ''}
               className="text-sm py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition disabled:opacity-50 text-left px-3"
@@ -189,37 +314,48 @@ export default function FinanceMonitoring({ onBack }) {
 
         {loading ? (
           <p className="text-slate-500 text-sm">กำลังโหลด...</p>
-        ) : monthly.length === 0 ? (
-          <p className="text-slate-500 text-sm bg-slate-800/50 rounded-lg p-3">ยังไม่มีข้อมูลรายได้/กำไร</p>
         ) : (
           <>
-            {/* รายได้และกำไรรายเดือน */}
             <section className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-              <h2 className="text-sm font-semibold text-slate-200">รายได้และกำไรรายเดือน</h2>
-              <p className="text-xs text-slate-500 mb-2">นับตามวันที่ขายออกจริง รวมข้อมูลปัจจุบันและย้อนหลัง</p>
-              <div style={{ width: '100%', height: 280 }}>
-                <ResponsiveContainer>
-                  <BarChart data={monthly} margin={{ left: 8, right: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                    <XAxis dataKey="monthLabel" stroke="#94a3b8" fontSize={11} />
-                    <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
-                    <Tooltip
-                      contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
-                      formatter={(value, name) => [`${Number(value).toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท`, name]}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => (v === 'revenue' ? 'รายได้' : 'กำไร')} />
-                    <Bar dataKey="revenue" fill="#2dd4bf" radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="profit" radius={[3, 3, 0, 0]}>
-                      {monthly.map((m, i) => (
-                        <Cell key={i} fill={m.profit >= 0 ? '#a78bfa' : '#ef4444'} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <Select
+                label="ดูข้อมูลของ"
+                value={selectedSku}
+                onChange={setSelectedSku}
+                placeholder="ทุกสินค้ารวมกัน"
+                options={skus.map((s) => ({ value: s.id, label: `${s.code} — ${s.name}` }))}
+              />
+              <p className="text-xs text-slate-500 mt-2">กำลังดู: {skuLabel}</p>
             </section>
 
-            {/* ตารางรายเดือน */}
+            <MetricChartPair
+              title="ต้นทุนสต๊อกที่นำเข้า"
+              subtitle="อิงจำนวนสต๊อกที่รับเข้าจริง (มีเฉพาะข้อมูลตั้งแต่เริ่มคีย์ในระบบ ไม่รวมย้อนหลัง)"
+              monthlyData={costMonthly}
+              annualData={costAnnual}
+              color="#fb923c"
+              unit="บาท"
+              emptyText="ยังไม่มีข้อมูลรับเข้าสต๊อก — เริ่มคีย์ 'รับเข้า' ที่หน้าคีย์ข้อมูลได้เลย"
+            />
+
+            <MetricChartPair
+              title="รายได้"
+              subtitle="นับตามวันที่ขายออกจริง รวมข้อมูลปัจจุบันและย้อนหลัง"
+              monthlyData={revenueMonthly}
+              annualData={revenueAnnual}
+              color="#2dd4bf"
+              unit="บาท"
+            />
+
+            <MetricChartPair
+              title="กำไร (ขาดทุน)"
+              subtitle="แดง = เดือน/ปีที่ขาดทุน"
+              monthlyData={profitMonthly}
+              annualData={profitAnnual}
+              color="#a78bfa"
+              unit="บาท"
+              colorByValue
+            />
+
             <section className="bg-slate-800 rounded-lg border border-slate-700 divide-y divide-slate-700">
               {[...monthly].reverse().map((m) => (
                 <div key={m.month} className="p-3 flex items-center justify-between">
@@ -237,7 +373,6 @@ export default function FinanceMonitoring({ onBack }) {
               ))}
             </section>
 
-            {/* ค่าโฆษณารายเดือน แยกตามร้าน */}
             <section className="bg-slate-800 rounded-xl p-4 border border-slate-700">
               <h2 className="text-sm font-semibold text-slate-200">ค่าโฆษณารายเดือน แยกตามร้าน</h2>
               <p className="text-xs text-slate-500 mb-2">รวมจากยอดที่คีย์รายสัปดาห์ทุกสุดสัปดาห์</p>
@@ -264,7 +399,6 @@ export default function FinanceMonitoring({ onBack }) {
               </div>
             </section>
 
-            {/* ค่าโฆษณารายเดือน รวมทุกร้าน */}
             <section className="bg-slate-800 rounded-xl p-4 border border-slate-700">
               <h2 className="text-sm font-semibold text-slate-200">ค่าโฆษณารายเดือน รวมทุกร้าน</h2>
               <p className="text-xs text-slate-500 mb-2">ยอดรวมทั้งหมดต่อเดือน ไม่แยกร้าน</p>
