@@ -220,7 +220,7 @@ export default function StockMonitoring({ onBack }) {
     setExportBusy('')
   }
 
-  const pieData = stock.map((s) => ({ name: s.code, value: s.on_hand }))
+  const pieData = stock.filter((s) => s.on_hand > 0).sort((a, b) => b.on_hand - a.on_hand).map((s) => ({ name: s.code, value: s.on_hand }))
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
@@ -348,27 +348,33 @@ export default function StockMonitoring({ onBack }) {
             </ChartCard>
 
             {/* 2. สัดส่วนสต็อกตาม SKU */}
-            <ChartCard title="สัดส่วนสต็อกตาม SKU" subtitle="เทียบเป็น % ของจำนวนชิ้นคงเหลือทั้งหมด">
-              <ResponsiveContainer>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={85}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    labelLine={false}
-                  >
-                    {pieData.map((_, i) => (
-                      <Cell key={i} fill={STORE_COLORS[i % STORE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} formatter={(value) => [`${value} ชิ้น`]} />
-                  <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} />
-                </PieChart>
-              </ResponsiveContainer>
+            <ChartCard
+              title="สัดส่วนสต็อกตาม SKU"
+              subtitle="เทียบเป็น % ของจำนวนชิ้นคงเหลือทั้งหมด (เฉพาะสินค้าที่มีสต๊อก) — แตะแต่ละชิ้นเพื่อดูตัวเลข"
+              height={440}
+            >
+              {pieData.length === 0 ? (
+                <p className="text-slate-500 text-sm">ยังไม่มีสต๊อกคงเหลือ</p>
+              ) : (
+                <ResponsiveContainer>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="42%"
+                      outerRadius={130}
+                    >
+                      {pieData.map((_, i) => (
+                        <Cell key={i} fill={STORE_COLORS[i % STORE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} formatter={(value) => [`${value} ชิ้น`]} />
+                    <Legend wrapperStyle={{ fontSize: 12, color: '#cbd5e1' }} layout="horizontal" />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </ChartCard>
 
             {/* 3. เปรียบเทียบยอดขายรายร้าน */}
