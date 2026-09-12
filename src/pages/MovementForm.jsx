@@ -31,7 +31,7 @@ export default function MovementForm({ onDone, onToast }) {
   useEffect(() => {
     async function load() {
       const [skuRes, storeRes, provinceRes] = await Promise.all([
-        supabase.from('skus').select('id, code, name').eq('active', true).order('code'),
+        supabase.from('skus').select('id, code, name, cost_amount, cost_currency, fx_rate, shipping_per_unit').eq('active', true).order('code'),
         supabase.from('stores').select('id, name, kind').eq('active', true).order('kind').order('name'),
         supabase.from('provinces').select('name').order('name'),
       ])
@@ -107,6 +107,37 @@ export default function MovementForm({ onDone, onToast }) {
         onChange={setKind}
         options={KIND_OPTIONS}
       />
+
+      {kind === 'in' && (() => {
+        // ต้นทุนจะถูกล็อคติดรายการนี้ตอนกดบันทึก แก้ทีหลังไม่ย้อนกลับมาแก้รายการนี้
+        // เลยต้องเตือนให้เช็คต้นทุนให้ตรงกับ lot ที่กำลังรับเข้าก่อน
+        const sku = skus.find((s) => s.id === skuId)
+        const landed = sku
+          ? (sku.cost_currency === 'THB'
+              ? Number(sku.cost_amount || 0)
+              : Number(sku.cost_amount || 0) * Number(sku.fx_rate || 1)
+            ) + Number(sku.shipping_per_unit || 0)
+          : null
+        return (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 space-y-1.5">
+            <p className="text-xs text-yellow-400 font-medium">
+              ⚠️ เช็คต้นทุนให้ตรงกับ lot นี้ก่อนบันทึก
+            </p>
+            <p className="text-[11px] text-yellow-400/80 leading-relaxed">
+              ระบบจะล็อคต้นทุนติดกับรายการนี้ทันทีที่กดบันทึก แก้ต้นทุนทีหลังจะไม่ย้อนมาแก้รายการนี้
+              ถ้าต้นทุน lot นี้เปลี่ยนไป ต้องไปแก้ที่หน้า &ldquo;จัดการสินค้า / ต้นทุน&rdquo; ก่อน แล้วค่อยกลับมาคีย์
+            </p>
+            {sku && landed != null && (
+              <p className="text-xs text-yellow-300 pt-1">
+                ต้นทุนปัจจุบันของ {sku.code}: <span className="font-bold">฿{landed.toLocaleString('th-TH', { maximumFractionDigits: 2 })}</span> /ชิ้น
+              </p>
+            )}
+            {!sku && (
+              <p className="text-[11px] text-yellow-400/60 pt-1">เลือกสินค้าด้านบนเพื่อดูต้นทุนปัจจุบัน</p>
+            )}
+          </div>
+        )
+      })()}
 
       <Select
         label="ร้าน (เว้นว่าง = คลังกลาง)"
