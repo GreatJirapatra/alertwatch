@@ -10,6 +10,8 @@ const KIND_OPTIONS = [
   { value: 'return', label: 'ตีกลับ (+)' },
   { value: 'adjust', label: 'ปรับปรุงยอด (+/-)' },
   { value: 'lost', label: 'ของหาย/ส่งเกิน (-)' },
+  { value: 'repair_out', label: 'ส่งซ่อม (-)' },
+  { value: 'repair_in', label: 'รับคืนจากซ่อม (+)' },
 ]
 
 export default function MovementForm({ onDone, onToast }) {
@@ -52,7 +54,7 @@ export default function MovementForm({ onDone, onToast }) {
     }
 
     let signedQty = Math.abs(Number(qty))
-    if (kind === 'out' || kind === 'lost') signedQty = -signedQty
+    if (kind === 'out' || kind === 'lost' || kind === 'repair_out') signedQty = -signedQty
     // adjust ให้ใส่ค่าติดลบเองได้ถ้าต้องการ (ผู้ใช้พิมพ์ -5 ได้ตรงๆ)
     if (kind === 'adjust') signedQty = Number(qty)
 

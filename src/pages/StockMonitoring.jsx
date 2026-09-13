@@ -45,6 +45,7 @@ const tooltipItemStyle = { color: '#ffffff' }
 
 export default function StockMonitoring({ onBack }) {
   const [stock, setStock] = useState([])
+  const [repairStatus, setRepairStatus] = useState([])
   const [storeSales, setStoreSales] = useState([])
   const [salesRange, setSalesRange] = useState('30') // '7' | '30' | 'all'
   const [provinceSku, setProvinceSku] = useState('') // '' = ทุก SKU
@@ -59,9 +60,13 @@ export default function StockMonitoring({ onBack }) {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const { data, error } = await supabase.from('stock_status').select('*').order('code')
-      if (error) setError(error.message)
-      setStock(data || [])
+      const [stockRes, repairRes] = await Promise.all([
+        supabase.from('stock_status').select('*').order('code'),
+        supabase.from('sku_repair_status').select('*').order('currently_in_repair', { ascending: false }),
+      ])
+      if (stockRes.error) setError(stockRes.error.message)
+      setStock(stockRes.data || [])
+      setRepairStatus((repairRes.data || []).filter((r) => r.currently_in_repair > 0))
       setLoading(false)
     }
     load()
@@ -161,7 +166,7 @@ export default function StockMonitoring({ onBack }) {
     if (error) {
       alert('ดึงข้อมูลไม่สำเร็จ: ' + error.message)
     } else {
-      const kindLabel = { in: 'รับเข้า', out: 'ขายออก', return: 'ตีกลับ', adjust: 'ปรับปรุงยอด', lost: 'ของหาย/ส่งเกิน' }
+      const kindLabel = { in: 'รับเข้า', out: 'ขายออก', return: 'ตีกลับ', adjust: 'ปรับปรุงยอด', lost: 'ของหาย/ส่งเกิน', repair_out: 'ส่งซ่อม', repair_in: 'รับคืนจากซ่อม' }
       exportToCsv(`รายการเคลื่อนไหวสต๊อก_${todayStamp()}.csv`, (data || []).map((r) => ({
         วันที่: r.moved_on,
         ประเภท: kindLabel[r.kind] || r.kind,
@@ -275,6 +280,21 @@ export default function StockMonitoring({ onBack }) {
             </div>
           )
         })()}
+
+        {repairStatus.length > 0 && (
+          <section className="bg-orange-500/10 rounded-xl p-4 border border-orange-500/30">
+            <h2 className="text-sm font-semibold text-orange-400 mb-1">🔧 สินค้ารอซ่อม</h2>
+            <p className="text-xs text-orange-400/70 mb-3">จำนวนนี้ถูกหักออกจากสต๊อกที่ขายได้แล้ว จนกว่าจะคีย์ "รับคืนจากซ่อม"</p>
+            <div className="divide-y divide-orange-500/20">
+              {repairStatus.map((r) => (
+                <div key={r.sku_id} className="py-1.5 flex items-center justify-between">
+                  <p className="text-sm text-slate-200">{r.code} — {r.name}</p>
+                  <p className="text-sm font-medium text-orange-400">{r.currently_in_repair} ชิ้น</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {loading ? (
           <p className="text-slate-500 text-sm">กำลังโหลด...</p>
