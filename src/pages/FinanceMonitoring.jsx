@@ -184,6 +184,11 @@ export default function FinanceMonitoring({ onBack }) {
   const [monthly, setMonthly] = useState([])
   const [adsByStore, setAdsByStore] = useState([])
   const [storeKeys, setStoreKeys] = useState([])
+  const [accountMonthly, setAccountMonthly] = useState([])
+  const [accountRecent, setAccountRecent] = useState([])
+  // ช่วงวันที่สำหรับ export รายละเอียดบัญชี — ค่าเริ่มต้นคือต้นปีนี้ถึงวันนี้
+  const [acctFrom, setAcctFrom] = useState(new Date().getFullYear() + '-01-01')
+  const [acctTo, setAcctTo] = useState(new Date().toISOString().slice(0, 10))
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [exportBusy, setExportBusy] = useState('')
@@ -191,15 +196,20 @@ export default function FinanceMonitoring({ onBack }) {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const [skuRes, rpRes, costRes, plRes, adsRes] = await Promise.all([
+      const [skuRes, rpRes, costRes, plRes, adsRes, acctMonthRes, acctRecentRes] = await Promise.all([
         supabase.from('skus').select('id, code, name').order('code'),
         supabase.from('sku_monthly_finance').select('month, sku_id, revenue, profit'),
         supabase.from('sku_monthly_cost').select('month, sku_id, cost'),
         supabase.from('monthly_revenue_profit_unified').select('*').order('month', { ascending: true }).limit(24),
         supabase.from('monthly_ads_by_store').select('*').order('month', { ascending: true }),
+        supabase.from('account_monthly_summary').select('*').order('month', { ascending: false }).limit(24),
+        supabase.from('account_entries').select('id, entry_date, description, amount, direction, category')
+          .order('entry_date', { ascending: false }).order('id', { ascending: false }).limit(30),
       ])
       if (rpRes.error) setError(rpRes.error.message)
       setSkus(skuRes.data || [])
+      setAccountMonthly(acctMonthRes.data || [])
+      setAccountRecent(acctRecentRes.data || [])
       // เปลี่ยนชื่อฟิลด์ month -> date ให้ตรงกับที่ฟังก์ชัน aggregate ด้านบนคาดไว้ (ข้อมูลเป็นรายเดือนอยู่แล้วจากฝั่ง DB)
       setRevenueProfitRows((rpRes.data || []).map((r) => ({ ...r, date: r.month })))
       setCostRows((costRes.data || []).map((r) => ({ ...r, date: r.month })))
@@ -332,6 +342,37 @@ export default function FinanceMonitoring({ onBack }) {
         ชื่อสินค้า: r.skus?.name || '',
         จำนวนชิ้น: r.qty,
         ต้นทุนรวม: r.cost,
+      })))
+    }
+    setExportBusy('')
+  }
+
+  async function exportAccountEntries() {
+    if (acctFrom > acctTo) {
+      alert('วันที่เริ่มต้นต้องไม่เกินวันที่สิ้นสุด')
+      return
+    }
+    setExportBusy('account')
+    const { data, error } = await supabase
+      .from('account_entries')
+      .select('entry_date, description, amount, direction, category, note')
+      .gte('entry_date', acctFrom)
+      .lte('entry_date', acctTo)
+      .order('entry_date', { ascending: true })
+
+    if (error) {
+      alert('ดึงข้อมูลไม่สำเร็จ: ' + error.message)
+    } else if ((data || []).length === 0) {
+      alert('ไม่มีรายการบัญชีในช่วงวันที่ที่เลือก')
+    } else {
+      exportToCsv(`รายละเอียดบัญชี_${acctFrom}_ถึง_${acctTo}.csv`, (data || []).map((r) => ({
+        วันที่: r.entry_date,
+        รายละเอียด: r.description,
+        ประเภท: r.direction === 'income' ? 'รายรับ' : 'รายจ่าย',
+        รายรับ: r.direction === 'income' ? r.amount : '',
+        รายจ่าย: r.direction === 'expense' ? r.amount : '',
+        หมวดหมู่: r.category || '',
+        หมายเหตุ: r.note || '',
       })))
     }
     setExportBusy('')
@@ -504,6 +545,105 @@ export default function FinanceMonitoring({ onBack }) {
                   </div>
                 </div>
               ))}
+            </section>
+
+            {/* บัญชีบริษัท — รายรับรายจ่ายที่ไม่เกี่ยวกับการขายโดยตรง */}
+            <section className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+              <h2 className="text-sm font-semibold text-slate-200">บัญชีบริษัท (รายรับ-รายจ่ายอื่น)</h2>
+              <p className="text-xs text-slate-500 mb-3">
+                รายการที่ไม่เกี่ยวกับการขายสินค้าโดยตรง — ไม่ถูกนำไปรวมในกำไรจากสินค้าด้านบน
+              </p>
+
+              {accountMonthly.length === 0 ? (
+                <p className="text-slate-500 text-sm">
+                  ยังไม่มีรายการบัญชี — เริ่มคีย์ได้ที่หน้าคีย์ข้อมูล → บัญชี
+                </p>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-slate-500 text-xs border-b border-slate-700">
+                          <th className="text-left py-1.5 font-normal">เดือน</th>
+                          <th className="text-right py-1.5 font-normal">รายรับ</th>
+                          <th className="text-right py-1.5 font-normal">รายจ่าย</th>
+                          <th className="text-right py-1.5 font-normal">สุทธิ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-700/60">
+                        {accountMonthly.map((m) => (
+                          <tr key={m.month}>
+                            <td className="py-1.5 text-slate-300">
+                              {new Date(m.month).toLocaleDateString('th-TH', { year: '2-digit', month: 'short' })}
+                            </td>
+                            <td className="text-right py-1.5 text-teal-400">
+                              {Number(m.income) ? Number(m.income).toLocaleString('th-TH', { maximumFractionDigits: 0 }) : '–'}
+                            </td>
+                            <td className="text-right py-1.5 text-red-400">
+                              {Number(m.expense) ? Number(m.expense).toLocaleString('th-TH', { maximumFractionDigits: 0 }) : '–'}
+                            </td>
+                            <td className={`text-right py-1.5 font-medium ${Number(m.net) >= 0 ? 'text-teal-400' : 'text-red-400'}`}>
+                              {Number(m.net).toLocaleString('th-TH', { maximumFractionDigits: 0 })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {accountRecent.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-xs text-slate-400 mb-1.5">รายการล่าสุด</p>
+                      <div className="divide-y divide-slate-700/60 max-h-64 overflow-y-auto">
+                        {accountRecent.map((r) => (
+                          <div key={r.id} className="py-1.5 flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm text-slate-300 truncate">{r.description}</p>
+                              <p className="text-[11px] text-slate-500">
+                                {r.entry_date}{r.category && ` · ${r.category}`}
+                              </p>
+                            </div>
+                            <p className={`text-sm flex-shrink-0 ${r.direction === 'income' ? 'text-teal-400' : 'text-red-400'}`}>
+                              {r.direction === 'income' ? '+' : '-'}{Number(r.amount).toLocaleString('th-TH', { maximumFractionDigits: 0 })}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="mt-4 pt-3 border-t border-slate-700">
+                <p className="text-xs text-slate-400 mb-2">Export รายละเอียดบัญชีตามช่วงวันที่</p>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div>
+                    <label className="text-[11px] text-slate-500">ตั้งแต่วันที่</label>
+                    <input
+                      type="date"
+                      value={acctFrom}
+                      onChange={(e) => setAcctFrom(e.target.value)}
+                      className="w-full mt-1 px-2 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-teal-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-500">ถึงวันที่</label>
+                    <input
+                      type="date"
+                      value={acctTo}
+                      onChange={(e) => setAcctTo(e.target.value)}
+                      className="w-full mt-1 px-2 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-teal-500"
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={exportAccountEntries}
+                  disabled={exportBusy !== ''}
+                  className="w-full text-sm py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-medium transition disabled:opacity-50"
+                >
+                  {exportBusy === 'account' ? 'กำลังเตรียมไฟล์...' : '📒 Export รายละเอียดบัญชี (CSV)'}
+                </button>
+              </div>
             </section>
 
             <section className="bg-slate-800 rounded-xl p-4 border border-slate-700">

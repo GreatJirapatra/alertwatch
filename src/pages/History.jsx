@@ -2,12 +2,14 @@ import { useState } from 'react'
 import MovementHistory from './MovementHistory'
 import PayoutHistory from './PayoutHistory'
 import AdsSpendHistory from './AdsSpendHistory'
+import AccountEntryHistory from './AccountEntryHistory'
 import { Toast } from '../components/Toast'
 
 const TABS = [
   { key: 'movement', label: 'สต๊อก' },
   { key: 'payout', label: 'ยอดเงิน' },
   { key: 'ads', label: 'ค่าโฆษณา' },
+  { key: 'account', label: 'บัญชี' },
 ]
 
 export default function History({ onBack }) {
@@ -28,7 +30,7 @@ export default function History({ onBack }) {
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
+            className={`flex-1 py-2 rounded-lg text-xs font-medium transition ${
               tab === t.key
                 ? 'bg-teal-600 text-white'
                 : 'bg-slate-800 text-slate-400 border border-slate-700'
@@ -46,6 +48,7 @@ export default function History({ onBack }) {
         {tab === 'movement' && <MovementHistory onToast={setToast} />}
         {tab === 'payout' && <PayoutHistory onToast={setToast} />}
         {tab === 'ads' && <AdsSpendHistory onToast={setToast} />}
+        {tab === 'account' && <AccountEntryHistory onToast={setToast} />}
       </main>
 
       <Toast toast={toast} onClose={() => setToast(null)} />

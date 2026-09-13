@@ -2,12 +2,14 @@ import { useState } from 'react'
 import MovementForm from './MovementForm'
 import PayoutForm from './PayoutForm'
 import AdsSpendForm from './AdsSpendForm'
+import AccountEntryForm from './AccountEntryForm'
 import { Toast } from '../components/Toast'
 
 const TABS = [
   { key: 'movement', label: 'สต๊อก' },
   { key: 'payout', label: 'ยอดเงิน' },
   { key: 'ads', label: 'ค่าโฆษณา' },
+  { key: 'account', label: 'บัญชี' },
 ]
 
 export default function DataEntry({ onBack }) {
@@ -28,7 +30,7 @@ export default function DataEntry({ onBack }) {
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
+            className={`flex-1 py-2 rounded-lg text-xs font-medium transition ${
               tab === t.key
                 ? 'bg-teal-600 text-white'
                 : 'bg-slate-800 text-slate-400 border border-slate-700'
@@ -43,6 +45,7 @@ export default function DataEntry({ onBack }) {
         {tab === 'movement' && <MovementForm onToast={setToast} />}
         {tab === 'payout' && <PayoutForm onToast={setToast} />}
         {tab === 'ads' && <AdsSpendForm onToast={setToast} />}
+        {tab === 'account' && <AccountEntryForm onToast={setToast} />}
       </main>
 
       <Toast toast={toast} onClose={() => setToast(null)} />
