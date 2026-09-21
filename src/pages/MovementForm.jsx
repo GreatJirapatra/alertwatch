@@ -53,6 +53,12 @@ export default function MovementForm({ onDone, onToast }) {
       return
     }
 
+    const requiresStore = kind === 'out' || kind === 'return' || kind === 'lost' || kind === 'repair_out'
+    if (requiresStore && !storeId) {
+      setMsg({ type: 'err', text: 'รายการนี้ผูกกับการขายของร้านใดร้านหนึ่ง กรุณาเลือกร้านก่อนบันทึก (ไม่งั้นระบบจะนับเป็นไม่มีร้าน ทำให้หน้าแรกมองว่าร้านนั้นไม่อัปเดต)' })
+      return
+    }
+
     let signedQty = Math.abs(Number(qty))
     if (kind === 'out' || kind === 'lost' || kind === 'repair_out') signedQty = -signedQty
     // adjust ให้ใส่ค่าติดลบเองได้ถ้าต้องการ (ผู้ใช้พิมพ์ -5 ได้ตรงๆ)
@@ -142,12 +148,29 @@ export default function MovementForm({ onDone, onToast }) {
       })()}
 
       <Select
-        label="ร้าน (เว้นว่าง = คลังกลาง)"
+        label={
+          kind === 'out' || kind === 'return' || kind === 'lost' || kind === 'repair_out'
+            ? 'ร้าน (บังคับเลือก — รายการนี้ผูกกับร้าน)'
+            : 'ร้าน (เว้นว่าง = คลังกลาง)'
+        }
         value={storeId}
         onChange={setStoreId}
         placeholder="คลังกลาง"
         options={stores.map((s) => ({ value: s.id, label: `${s.name} (${s.kind === 'own' ? 'ตัวเอง' : 'เพื่อน'})` }))}
       />
+
+      {storeId ? (
+        <div className="bg-teal-500/10 border border-teal-500/30 rounded-lg px-3 py-2">
+          <p className="text-xs text-teal-300">
+            📍 กำลังคีย์ให้ร้าน: <span className="font-bold">{stores.find((s) => s.id === storeId)?.name}</span>
+            {' '}— ค่านี้จะค้างไว้สำหรับรายการถัดไป ถ้าจะเปลี่ยนร้านต้องกดเลือกใหม่เอง
+          </p>
+        </div>
+      ) : (
+        <div className="bg-slate-700/40 border border-slate-600 rounded-lg px-3 py-2">
+          <p className="text-xs text-slate-400">📍 ยังไม่ได้เลือกร้าน — รายการนี้จะเข้าคลังกลาง (ไม่นับเป็นของร้านไหน)</p>
+        </div>
+      )}
 
       <Input
         label={kind === 'adjust' ? 'จำนวน (ใส่ - หน้าเลขได้ถ้าต้องการลด)' : 'จำนวน'}
@@ -202,4 +225,4 @@ export default function MovementForm({ onDone, onToast }) {
       </button>
     </form>
   )
-}
+} requires store on out movements
