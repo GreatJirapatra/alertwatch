@@ -88,7 +88,7 @@ function MetricChartPair({ title, subtitle, monthlyData, annualData, color, unit
               <BarChart data={monthlyData} margin={{ left: 8, right: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                 <XAxis dataKey="monthLabel" stroke="#94a3b8" fontSize={10} />
-                <YAxis stroke="#64748b" fontSize={10} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                <YAxis domain={[(dataMin) => Math.min(0, dataMin), 'dataMax']} stroke="#64748b" fontSize={10} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
                 <Tooltip
                   contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
                   formatter={(value) => [`${Number(value).toLocaleString('th-TH', { maximumFractionDigits: 0 })} ${unit}`, title]}
@@ -108,7 +108,7 @@ function MetricChartPair({ title, subtitle, monthlyData, annualData, color, unit
               <BarChart data={annualData} margin={{ left: 8, right: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                 <XAxis dataKey="year" stroke="#94a3b8" fontSize={11} />
-                <YAxis stroke="#64748b" fontSize={10} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                <YAxis domain={[(dataMin) => Math.min(0, dataMin), 'dataMax']} stroke="#64748b" fontSize={10} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
                 <Tooltip
                   contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
                   formatter={(value) => [`${Number(value).toLocaleString('th-TH', { maximumFractionDigits: 0 })} ${unit}`, title]}
@@ -146,8 +146,14 @@ function BySkuBarChart({ title, subtitle, data, color, unit, colorByValue, empty
         <ResponsiveContainer>
           <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-            <XAxis type="number" stroke="#64748b" fontSize={10} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
-            <YAxis type="category" dataKey="code" stroke="#94a3b8" fontSize={11} width={90} />
+            <XAxis
+              type="number"
+              stroke="#64748b"
+              fontSize={10}
+              tickFormatter={(v) => `${Math.round(v / 1000)}k`}
+              domain={[(dataMin) => Math.min(0, dataMin), 'dataMax']}
+            />
+            <YAxis type="category" dataKey="code" stroke="#94a3b8" fontSize={10} width={150} interval={0} />
             <Tooltip
               contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
               formatter={(value, _name, props) => [`${Number(value).toLocaleString('th-TH', { maximumFractionDigits: 0 })} ${unit}`, props.payload.name]}
@@ -657,7 +663,7 @@ export default function FinanceMonitoring({ onBack }) {
                     <BarChart data={adsByStore} margin={{ left: 8, right: 8 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                       <XAxis dataKey="monthLabel" stroke="#94a3b8" fontSize={11} />
-                      <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                      <YAxis domain={[(dataMin) => Math.min(0, dataMin), 'dataMax']} stroke="#64748b" fontSize={11} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
                       <Tooltip
                         contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
                         formatter={(value, name) => [`${Number(value).toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท`, name]}
@@ -683,7 +689,7 @@ export default function FinanceMonitoring({ onBack }) {
                     <BarChart data={adsByStore} margin={{ left: 8, right: 8 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                       <XAxis dataKey="monthLabel" stroke="#94a3b8" fontSize={11} />
-                      <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                      <YAxis domain={[(dataMin) => Math.min(0, dataMin), 'dataMax']} stroke="#64748b" fontSize={11} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
                       <Tooltip
                         contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
                         formatter={(value) => [`${Number(value).toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท`, 'ค่าโฆษณารวม']}

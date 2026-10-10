@@ -309,8 +309,8 @@ export default function StockMonitoring({ onBack }) {
               <ResponsiveContainer>
                 <BarChart data={stock} layout="vertical" margin={{ left: 8, right: 16 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-                  <XAxis type="number" stroke="#64748b" fontSize={11} />
-                  <YAxis type="category" dataKey="code" stroke="#94a3b8" fontSize={11} width={90} />
+                  <XAxis type="number" stroke="#64748b" fontSize={11} domain={[0, 'dataMax']} />
+                  <YAxis type="category" dataKey="code" stroke="#94a3b8" fontSize={10} width={150} interval={0} />
                   <Tooltip
                     contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
                     formatter={(value, _name, props) => [`${value} ชิ้น`, props.payload.name]}
@@ -337,8 +337,8 @@ export default function StockMonitoring({ onBack }) {
                   margin={{ left: 8, right: 16 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-                  <XAxis type="number" stroke="#64748b" fontSize={11} />
-                  <YAxis type="category" dataKey="code" stroke="#94a3b8" fontSize={11} width={90} />
+                  <XAxis type="number" stroke="#64748b" fontSize={11} domain={[0, 'dataMax']} />
+                  <YAxis type="category" dataKey="code" stroke="#94a3b8" fontSize={10} width={150} interval={0} />
                   <Tooltip
                     contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
                     formatter={(value, _name, props) => [
@@ -425,7 +425,7 @@ export default function StockMonitoring({ onBack }) {
                   <ResponsiveContainer>
                     <BarChart data={storeSales} layout="vertical" margin={{ left: 8, right: 16 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-                      <XAxis type="number" stroke="#64748b" fontSize={11} />
+                      <XAxis type="number" stroke="#64748b" fontSize={11} domain={[0, 'dataMax']} />
                       <YAxis type="category" dataKey="name" stroke="#94a3b8" fontSize={11} width={90} />
                       <Tooltip contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} formatter={(value) => [`${value} ชิ้น`, 'ขายแล้ว']} />
                       <Bar dataKey="units" fill="#38bdf8" radius={[0, 4, 4, 0]} />
@@ -482,7 +482,7 @@ export default function StockMonitoring({ onBack }) {
                   <ResponsiveContainer>
                     <BarChart data={provinceData} layout="vertical" margin={{ left: 8, right: 16 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-                      <XAxis type="number" stroke="#64748b" fontSize={11} />
+                      <XAxis type="number" stroke="#64748b" fontSize={11} domain={[0, 'dataMax']} />
                       <YAxis type="category" dataKey="province" stroke="#94a3b8" fontSize={11} width={90} />
                       <Tooltip contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} formatter={(value) => [`${value} ชิ้น`, 'ขายแล้ว']} />
                       <Bar dataKey="units" fill="#a78bfa" radius={[0, 4, 4, 0]} />

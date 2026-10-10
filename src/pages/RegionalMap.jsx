@@ -215,7 +215,7 @@ export default function RegionalMap({ onBack }) {
                     <BarChart data={seasonChartData} margin={{ left: -10 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                       <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
-                      <YAxis stroke="#64748b" fontSize={11} />
+                      <YAxis domain={[(dataMin) => Math.min(0, dataMin), 'dataMax']} stroke="#64748b" fontSize={11} />
                       <Tooltip
                         contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12, color: '#ffffff' }}
                           labelStyle={{ color: '#ffffff', fontWeight: 600 }}
