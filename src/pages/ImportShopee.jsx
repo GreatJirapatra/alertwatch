@@ -5,6 +5,8 @@ import { useAuth } from '../lib/AuthContext'
 import { Select } from '../components/FormFields'
 import { orderDateFromNo } from '../lib/orderDate'
 
+const NON_STOCK = '__NONSTOCK__' // ค่าพิเศษในช่องเลือก SKU = สินค้านอกสต๊อก
+
 function excelDateToIso(val) {
   // Shopee ให้มาเป็น string วันที่ 'YYYY-MM-DD' หรือ 'YYYY-MM-DD HH:mm' อยู่แล้วเกือบทุกกรณี
   if (!val) return null
@@ -41,12 +43,12 @@ export default function ImportShopee({ onBack }) {
       const [storeRes, skuRes, aliasRes] = await Promise.all([
         supabase.from('stores').select('id, name, kind').eq('active', true).order('kind').order('name'),
         supabase.from('skus').select('id, code, name').eq('active', true).order('code'),
-        supabase.from('sku_import_aliases').select('shopee_name, sku_id').eq('platform', 'shopee'),
+        supabase.from('sku_import_aliases').select('shopee_name, sku_id, is_non_stock').eq('platform', 'shopee'),
       ])
       setStores(storeRes.data || [])
       setSkus(skuRes.data || [])
       const aliasMap = {}
-      for (const a of aliasRes.data || []) aliasMap[a.shopee_name] = a.sku_id
+      for (const a of aliasRes.data || []) aliasMap[a.shopee_name] = a.is_non_stock ? NON_STOCK : a.sku_id
       setAliases(aliasMap)
     }
     load()
@@ -166,16 +168,43 @@ export default function ImportShopee({ onBack }) {
     setCommitting(true)
     setFileError('')
 
-    // บันทึก alias ใหม่ที่ยังไม่เคยมี (สำหรับ import ครั้งต่อไป)
-    const newAliases = parsedOrders
-      .filter((it) => !aliases[it.shopeeName])
-      .map((it) => ({ platform: 'shopee', shopee_name: it.shopeeName, sku_id: it.matchedSkuId }))
+    // บันทึก alias ใหม่ที่ยังไม่เคยมี (สำหรับ import ครั้งต่อไป) — รวมชื่อซ้ำในไฟล์ให้เหลือแถวเดียว
+    const aliasMapNew = new Map()
+    for (const it of parsedOrders) {
+      if (aliases[it.shopeeName] || aliasMapNew.has(it.shopeeName)) continue
+      const nonStock = it.matchedSkuId === NON_STOCK
+      aliasMapNew.set(it.shopeeName, {
+        platform: 'shopee',
+        shopee_name: it.shopeeName,
+        sku_id: nonStock ? null : it.matchedSkuId,
+        is_non_stock: nonStock,
+      })
+    }
+    const newAliases = [...aliasMapNew.values()]
     if (newAliases.length > 0) {
       await supabase.from('sku_import_aliases').upsert(newAliases, { onConflict: 'platform,shopee_name' })
     }
 
+    // แยกบรรทัดนอกสต๊อก (ไม่สร้างแถวสต๊อกขายออก) ออกจากบรรทัดในสต๊อก
+    const stockItems = parsedOrders.filter((it) => it.matchedSkuId !== NON_STOCK)
+    const nonStockItems = parsedOrders.filter((it) => it.matchedSkuId === NON_STOCK)
+    // ออเดอร์ที่ "ทุกบรรทัด" เป็นนอกสต๊อก → ยอดโอนนับเป็นรายรับล้วน ไม่มีต้นทุน
+    const stockOrderNos = new Set(stockItems.map((it) => it.orderNo))
+    const nonStockOnlyOrders = [...new Set(nonStockItems.map((it) => it.orderNo))].filter((no) => !stockOrderNos.has(no))
+    if (nonStockOnlyOrders.length > 0) {
+      const { error: nsErr } = await supabase
+        .from('non_stock_orders')
+        .upsert(nonStockOnlyOrders.map((no) => ({ order_no: no, store_id: storeId })), { onConflict: 'order_no' })
+      if (nsErr) {
+        setFileError('บันทึกออเดอร์นอกสต๊อกไม่สำเร็จ: ' + nsErr.message)
+        setCommitting(false)
+        return
+      }
+    }
+    const nonStockCount = nonStockItems.length
+
     // ข้ามรายการที่มีในระบบแล้ว (ร้าน + เลขออเดอร์ + SKU เดียวกัน) กันซ้ำกับที่คีย์เองหรือ import ไปก่อนหน้า
-    const orderNos = [...new Set(parsedOrders.map((it) => it.orderNo))]
+    const orderNos = [...new Set(stockItems.map((it) => it.orderNo))]
     const existingKeys = new Set()
     for (let i = 0; i < orderNos.length; i += 200) {
       const chunk = orderNos.slice(i, i + 200)
@@ -192,11 +221,11 @@ export default function ImportShopee({ onBack }) {
       }
       for (const r of existing || []) existingKeys.add(`${r.order_no}|${r.sku_id}`)
     }
-    const toInsert = parsedOrders.filter((it) => !existingKeys.has(`${it.orderNo}|${it.matchedSkuId}`))
-    const skippedCount = parsedOrders.length - toInsert.length
+    const toInsert = stockItems.filter((it) => !existingKeys.has(`${it.orderNo}|${it.matchedSkuId}`))
+    const skippedCount = stockItems.length - toInsert.length
 
     if (toInsert.length === 0) {
-      setResult({ type: 'orders', count: 0, skippedCount })
+      setResult({ type: 'orders', count: 0, skippedCount, nonStockCount })
       setParsedOrders(null)
       setCommitting(false)
       return
@@ -217,7 +246,7 @@ export default function ImportShopee({ onBack }) {
     if (error) {
       setFileError('บันทึกไม่สำเร็จ: ' + error.message)
     } else {
-      setResult({ type: 'orders', count: movementRows.length, skippedCount })
+      setResult({ type: 'orders', count: movementRows.length, skippedCount, nonStockCount })
       setParsedOrders(null)
     }
     setCommitting(false)
@@ -336,6 +365,11 @@ export default function ImportShopee({ onBack }) {
             {result.type === 'orders' ? (
               <>
                 บันทึกรายการขายออกสำเร็จ {result.count} รายการ
+                {result.nonStockCount > 0 && (
+                  <span className="block text-xs mt-1">
+                    (นอกสต๊อก {result.nonStockCount} รายการ — ไม่ตัดสต๊อก ไม่มีต้นทุน)
+                  </span>
+                )}
                 {result.skippedCount > 0 && (
                   <span className="block text-xs mt-1">
                     (ข้าม {result.skippedCount} รายการที่มีในระบบแล้ว ไม่ได้บันทึกซ้ำ)
@@ -375,7 +409,7 @@ export default function ImportShopee({ onBack }) {
                     value={it.matchedSkuId}
                     onChange={(v) => updateMatch(idx, v)}
                     placeholder="เลือก SKU ที่ตรงกัน"
-                    options={skus.map((s) => ({ value: s.id, label: `${s.code} — ${s.name}` }))}
+                    options={[{ value: NON_STOCK, label: '🚫 นอกสต๊อก (ไม่ตัดสต๊อก / ไม่มีต้นทุน)' }, ...skus.map((s) => ({ value: s.id, label: `${s.code} — ${s.name}` }))]}
                   />
                 </div>
               ))}
