@@ -288,6 +288,8 @@ export default function FinanceMonitoring({ onBack }) {
         รายได้: r.revenue,
         กำไร: r.profit,
         มาร์จิ้น: r.revenue > 0 ? ((r.profit / r.revenue) * 100).toFixed(2) + '%' : '',
+        ของหาย_ชิ้น: r.lost_units || 0,
+        มูลค่าของหาย_หักในกำไรแล้ว: r.lost_value || 0,
       })))
     }
     setExportBusy('')
@@ -305,7 +307,9 @@ export default function FinanceMonitoring({ onBack }) {
         เงินเข้าจริง: r.received,
         ต้นทุนขาย: r.cogs,
         ค่าโฆษณา: r.ads,
-        กำไรสุทธิ: r.net_profit,
+        ของหาย_ชิ้น: r.lost_units || 0,
+        มูลค่าของหาย: r.lost_value || 0,
+        กำไรสุทธิ_หลังหักของหาย: r.net_profit,
         มาร์จิ้นสุทธิ: r.net_margin != null ? (r.net_margin * 100).toFixed(2) + '%' : '',
         ต้นทุนที่ยังไม่รู้ผล_ยังไม่มีpayoutคู่กัน: r.unmatched_cogs || 0,
         เงินเข้าที่ยังไม่ผูกออเดอร์: r.unmatched_received || 0,
@@ -542,6 +546,11 @@ export default function FinanceMonitoring({ onBack }) {
                   <div>
                     <p className="text-sm">{new Date(m.month).toLocaleDateString('th-TH', { year: 'numeric', month: 'long' })}</p>
                     <p className="text-xs text-slate-500">{m.units} ชิ้น</p>
+                    {Number(m.lost_units) > 0 && (
+                      <p className="text-xs text-red-400">
+                        ของหาย {Number(m.lost_units)} ชิ้น · มูลค่า ฿{Number(m.lost_value).toLocaleString('th-TH', { maximumFractionDigits: 0 })} (หักในกำไรแล้ว)
+                      </p>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-teal-400">฿{Number(m.revenue).toLocaleString('th-TH', { maximumFractionDigits: 0 })}</p>

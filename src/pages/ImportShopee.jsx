@@ -173,7 +173,35 @@ export default function ImportShopee({ onBack }) {
       await supabase.from('sku_import_aliases').upsert(newAliases, { onConflict: 'platform,shopee_name' })
     }
 
-    const movementRows = parsedOrders.map((it) => ({
+    // ข้ามรายการที่มีในระบบแล้ว (ร้าน + เลขออเดอร์ + SKU เดียวกัน) กันซ้ำกับที่คีย์เองหรือ import ไปก่อนหน้า
+    const orderNos = [...new Set(parsedOrders.map((it) => it.orderNo))]
+    const existingKeys = new Set()
+    for (let i = 0; i < orderNos.length; i += 200) {
+      const chunk = orderNos.slice(i, i + 200)
+      const { data: existing, error: exErr } = await supabase
+        .from('movements')
+        .select('sku_id, order_no')
+        .eq('kind', 'out')
+        .eq('store_id', storeId)
+        .in('order_no', chunk)
+      if (exErr) {
+        setFileError('ตรวจรายการซ้ำไม่สำเร็จ ยังไม่ได้บันทึกอะไร: ' + exErr.message)
+        setCommitting(false)
+        return
+      }
+      for (const r of existing || []) existingKeys.add(`${r.order_no}|${r.sku_id}`)
+    }
+    const toInsert = parsedOrders.filter((it) => !existingKeys.has(`${it.orderNo}|${it.matchedSkuId}`))
+    const skippedCount = parsedOrders.length - toInsert.length
+
+    if (toInsert.length === 0) {
+      setResult({ type: 'orders', count: 0, skippedCount })
+      setParsedOrders(null)
+      setCommitting(false)
+      return
+    }
+
+    const movementRows = toInsert.map((it) => ({
       sku_id: it.matchedSkuId,
       store_id: storeId,
       kind: 'out',
@@ -188,7 +216,7 @@ export default function ImportShopee({ onBack }) {
     if (error) {
       setFileError('บันทึกไม่สำเร็จ: ' + error.message)
     } else {
-      setResult({ type: 'orders', count: movementRows.length })
+      setResult({ type: 'orders', count: movementRows.length, skippedCount })
       setParsedOrders(null)
     }
     setCommitting(false)
@@ -305,7 +333,14 @@ export default function ImportShopee({ onBack }) {
         {result && (
           <div className="bg-teal-500/10 border border-teal-500/30 text-teal-400 text-sm p-3 rounded-lg">
             {result.type === 'orders' ? (
-              <>บันทึกรายการขายออกสำเร็จ {result.count} รายการ</>
+              <>
+                บันทึกรายการขายออกสำเร็จ {result.count} รายการ
+                {result.skippedCount > 0 && (
+                  <span className="block text-xs mt-1">
+                    (ข้าม {result.skippedCount} รายการที่มีในระบบแล้ว ไม่ได้บันทึกซ้ำ)
+                  </span>
+                )}
+              </>
             ) : (
               <>
                 บันทึกยอดเงินเข้าสำเร็จ {result.count} รายการ

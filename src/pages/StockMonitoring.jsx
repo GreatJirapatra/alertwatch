@@ -219,6 +219,8 @@ export default function StockMonitoring({ onBack }) {
 
   const pieData = stock.filter((s) => s.on_hand > 0).sort((a, b) => b.on_hand - a.on_hand).map((s) => ({ name: s.code, value: s.on_hand }))
 
+  const coverSorted = [...stock].sort((a, b) => (b.days_cover ?? 999999) - (a.days_cover ?? 999999))
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
       <header className="border-b border-slate-800 px-4 py-4 flex items-center gap-3 sticky top-0 bg-slate-900/95 backdrop-blur z-10">
@@ -309,7 +311,7 @@ export default function StockMonitoring({ onBack }) {
               <ResponsiveContainer>
                 <BarChart data={stock} layout="vertical" margin={{ left: 8, right: 16 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-                  <XAxis type="number" stroke="#64748b" fontSize={11} domain={[0, 'dataMax']} />
+                  <XAxis type="number" stroke="#64748b" fontSize={11} domain={[(dataMin) => Math.min(0, dataMin), 'dataMax']} />
                   <YAxis type="category" dataKey="code" stroke="#94a3b8" fontSize={10} width={150} interval={0} />
                   <Tooltip
                     contentStyle={tooltipStyle()} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
@@ -332,7 +334,7 @@ export default function StockMonitoring({ onBack }) {
             >
               <ResponsiveContainer>
                 <BarChart
-                  data={[...stock].sort((a, b) => (b.days_cover ?? 999999) - (a.days_cover ?? 999999))}
+                  data={coverSorted}
                   layout="vertical"
                   margin={{ left: 8, right: 16 }}
                 >
@@ -347,7 +349,7 @@ export default function StockMonitoring({ onBack }) {
                     ]}
                   />
                   <Bar dataKey="days_cover" radius={[0, 4, 4, 0]}>
-                    {stock.map((row) => (
+                    {coverSorted.map((row) => (
                       <Cell key={row.id} fill={
                         row.days_cover == null || row.days_cover > 90 ? '#ef4444'
                         : row.days_cover > 30 ? '#f59e0b'
