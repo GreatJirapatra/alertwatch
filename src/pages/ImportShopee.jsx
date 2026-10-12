@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { Select } from '../components/FormFields'
+import { orderDateFromNo } from '../lib/orderDate'
 
 function excelDateToIso(val) {
   // Shopee ให้มาเป็น string วันที่ 'YYYY-MM-DD' หรือ 'YYYY-MM-DD HH:mm' อยู่แล้วเกือบทุกกรณี
@@ -83,7 +84,7 @@ export default function ImportShopee({ onBack }) {
 
           items.push({
             orderNo: String(orderNo),
-            date: excelDateToIso(dateVal),
+            date: orderDateFromNo(orderNo) || excelDateToIso(dateVal), // ยึดวันที่จากเลขออเดอร์ก่อน
             shopeeName,
             qty: netQty,
             matchedSkuId: aliases[shopeeName] || '',

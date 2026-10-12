@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { Select, Input } from '../components/FormFields'
 import { SearchableSelect } from '../components/SearchableSelect'
+import { orderDateFromNo, looksLikeBrokenShopeeNo } from '../lib/orderDate'
 
 const KIND_OPTIONS = [
   { value: 'in', label: 'รับเข้า (+)' },
@@ -44,9 +45,22 @@ export default function MovementForm({ onDone, onToast }) {
     load()
   }, [])
 
+  // วันที่ของรายการขายออกยึดตามเลขออเดอร์ Shopee (ระบบฐานข้อมูลบังคับให้ตรงกันด้วย)
+  const orderDate = kind === 'out' ? orderDateFromNo(orderNo) : null
+  const brokenOrderNo = kind === 'out' && looksLikeBrokenShopeeNo(orderNo)
+
+  useEffect(() => {
+    if (orderDate) setMovedOn(orderDate)
+  }, [orderDate])
+
   async function handleSubmit(e) {
     e.preventDefault()
     setMsg(null)
+
+    if (orderDate && orderDate > new Date().toISOString().slice(0, 10)) {
+      setMsg({ type: 'err', text: `เลขออเดอร์นี้บอกวันที่ ${orderDate} ซึ่งยังไม่ถึง กรุณาตรวจเลขออเดอร์อีกครั้ง` })
+      return
+    }
 
     if (!skuId || !qty) {
       setMsg({ type: 'err', text: 'กรุณาเลือกสินค้าและใส่จำนวน' })
@@ -182,19 +196,29 @@ export default function MovementForm({ onDone, onToast }) {
       />
 
       <Input
-        label="วันที่"
+        label={orderDate ? 'วันที่ (ใช้ตามเลขออเดอร์ — แก้ไม่ได้)' : 'วันที่'}
         type="date"
         value={movedOn}
         onChange={(e) => setMovedOn(e.target.value)}
+        disabled={!!orderDate}
       />
 
       <Input
         label="เลขที่ออเดอร์ (ถ้ามี)"
         type="text"
         value={orderNo}
-        onChange={(e) => setOrderNo(e.target.value)}
-        placeholder="เช่น MM-1023"
+        onChange={(e) => setOrderNo(e.target.value.trim())}
+        placeholder="เช่น 260930DK0T9PA1"
       />
+      {orderDate && (
+        <p className="text-xs text-teal-300">📅 ระบบอ่านวันที่จากเลขออเดอร์ได้: {orderDate} — ใช้วันนี้เป็นวันที่ของรายการ</p>
+      )}
+      {brokenOrderNo && (
+        <p className="text-xs text-amber-400">
+          ⚠️ เลขนี้ดูคล้ายเลข Shopee แต่รูปแบบไม่ครบ (ควรเป็นตัวเลข 6 ตัว + ตัวอักษร/ตัวเลข 8 ตัว รวม 14 ตัว)
+          ตอนนี้ {orderNo.length} ตัว — ตรวจกับต้นฉบับอีกครั้ง ไม่งั้นจะจับคู่กับยอดโอนไม่ได้
+        </p>
+      )}
 
       <SearchableSelect
         label="จังหวัดลูกค้า (ถ้ามี — สำหรับข้อมูล marketing)"
