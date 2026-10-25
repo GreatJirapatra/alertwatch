@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { Select, Input } from '../components/FormFields'
 import { ConfirmDeleteButton } from '../components/ConfirmDeleteButton'
 import { Toast } from '../components/Toast'
+import { matchesQuery } from '../lib/search'
 
 function toNum(v, fallback = 0) {
   const n = Number(v)
@@ -130,6 +131,7 @@ export default function SkuManager({ onBack }) {
   const [savingId, setSavingId] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
   const [filter, setFilter] = useState('all') // all | active | inactive
+  const [query, setQuery] = useState('')
 
   async function load() {
     setLoading(true)
@@ -257,8 +259,9 @@ export default function SkuManager({ onBack }) {
   }
 
   const filtered = skus.filter((s) => {
-    if (filter === 'active') return s.active
-    if (filter === 'inactive') return !s.active
+    if (filter === 'active' && !s.active) return false
+    if (filter === 'inactive' && s.active) return false
+    if (query.trim() && !matchesQuery(`${s.code} ${s.name} ${s.category || ''}`, query)) return false
     return true
   })
   const missingCostCount = skus.filter((s) => !s.active && toNum(s.cost_amount) === 0).length
@@ -309,6 +312,26 @@ export default function SkuManager({ onBack }) {
           </div>
         )}
 
+        <div className="relative">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="ค้นหาสินค้า — พิมพ์รหัส ตัวย่อ หรือชื่อ (เช่น seal80)"
+            className="w-full px-3 py-2 pr-9 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-teal-500"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              aria-label="ล้างคำค้น"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-lg leading-none px-1"
+            >
+              ×
+            </button>
+          )}
+        </div>
+
         <div className="flex gap-2">
           {[
             { key: 'all', label: `ทั้งหมด (${skus.length})` },
@@ -330,7 +353,7 @@ export default function SkuManager({ onBack }) {
         {loading ? (
           <p className="text-slate-500 text-sm">กำลังโหลด...</p>
         ) : filtered.length === 0 ? (
-          <p className="text-slate-500 text-sm bg-slate-800/50 rounded-lg p-3">ไม่มีรายการ</p>
+          <p className="text-slate-500 text-sm bg-slate-800/50 rounded-lg p-3">{query.trim() ? `ไม่พบสินค้าที่ตรงกับ "${query.trim()}"` : 'ไม่มีรายการ'}</p>
         ) : (
           <div className="space-y-2">
             {filtered.map((s) => {

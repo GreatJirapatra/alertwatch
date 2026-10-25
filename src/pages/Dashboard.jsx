@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
+import { InstallButton } from '../components/InstallButton'
 
 function StatusBadge({ action }) {
   const styles = {
@@ -110,9 +111,12 @@ export default function Dashboard({ onNavigateDataEntry, onNavigateStockMonitori
           </h1>
           <p className="text-xs text-slate-500">{user?.email}</p>
         </div>
-        <button onClick={signOut} className="text-xs text-slate-400 hover:text-red-400 transition">
-          ออกจากระบบ
-        </button>
+        <div className="flex items-center">
+          <InstallButton />
+          <button onClick={signOut} className="text-xs text-slate-400 hover:text-red-400 transition">
+            ออกจากระบบ
+          </button>
+        </div>
       </header>
 
       <nav className="px-4 py-3 grid grid-cols-2 gap-2 max-w-3xl mx-auto border-b border-slate-800/60">

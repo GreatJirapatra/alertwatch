@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { Select } from '../components/FormFields'
+import { SkuSelect } from '../components/SkuSelect'
 import { orderDateFromNo } from '../lib/orderDate'
 
 const NON_STOCK = '__NONSTOCK__' // ค่าพิเศษในช่องเลือก SKU = สินค้านอกสต๊อก
@@ -404,7 +405,7 @@ export default function ImportShopee({ onBack }) {
                 <div key={idx} className="bg-slate-800 rounded-lg p-3 border border-slate-700">
                   <p className="text-xs text-slate-400 mb-1">{it.orderNo} · {it.date} · จำนวน {it.qty}</p>
                   <p className="text-xs text-slate-300 mb-2 line-clamp-2">{it.shopeeName}</p>
-                  <Select
+                  <SkuSelect
                     label=""
                     value={it.matchedSkuId}
                     onChange={(v) => updateMatch(idx, v)}

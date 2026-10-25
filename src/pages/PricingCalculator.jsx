@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { Select, Input } from '../components/FormFields'
+import { Input } from '../components/FormFields'
+import { SkuSelect } from '../components/SkuSelect'
 
 function toNum(v, fallback = 0) {
   const n = Number(v)
@@ -133,7 +134,7 @@ export default function PricingCalculator({ onBack }) {
           <p className="text-slate-500 text-sm">กำลังโหลด...</p>
         ) : (
           <>
-            <Select
+            <SkuSelect
               label="เลือก SKU (หรือกรอกเองด้านล่างสำหรับสินค้าใหม่)"
               value={skuId}
               onChange={loadSku}

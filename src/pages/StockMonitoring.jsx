@@ -5,7 +5,7 @@ import {
 } from 'recharts'
 import { supabase } from '../lib/supabase'
 import { exportToCsv, todayStamp } from '../lib/csvExport'
-import { Select } from '../components/FormFields'
+import { SkuSelect } from '../components/SkuSelect'
 
 // เขียวเหลือเยอะ / เหลืองใกล้ต้องสั่ง / แดงต้องสั่งแล้วหรือหมด
 function stockColor(row) {
@@ -445,7 +445,7 @@ export default function StockMonitoring({ onBack }) {
               </p>
 
               <div className="grid grid-cols-2 gap-2 mb-3">
-                <Select
+                <SkuSelect
                   label="สินค้า"
                   value={provinceSku}
                   onChange={setProvinceSku}

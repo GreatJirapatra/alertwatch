@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { Select, Input } from '../components/FormFields'
+import { SkuSelect } from '../components/SkuSelect'
 import { SearchableSelect } from '../components/SearchableSelect'
 import { orderDateFromNo, looksLikeBrokenShopeeNo } from '../lib/orderDate'
 
@@ -115,7 +116,7 @@ export default function MovementForm({ onDone, onToast }) {
     <form onSubmit={handleSubmit} className="space-y-3 bg-slate-800 rounded-xl p-4 border border-slate-700">
       <h3 className="text-sm font-semibold text-slate-200">คีย์การเคลื่อนไหวสต๊อก</h3>
 
-      <Select
+      <SkuSelect
         label="สินค้า"
         value={skuId}
         onChange={setSkuId}

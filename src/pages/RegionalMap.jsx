@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { supabase } from '../lib/supabase'
-import { Select } from '../components/FormFields'
+import { SkuSelect } from '../components/SkuSelect'
 import { REGIONS, PROVINCE_TO_REGION, SEASONS, MONTH_TO_SEASON } from '../lib/thailandRegions'
 
 // รูปแผนที่ประเทศไทยแบบเสมือน (ไม่ได้อ้างอิงเส้นเขตแดนจริง) — จัดวาง 6 ภาคตามตำแหน่งคร่าวๆ
@@ -139,7 +139,7 @@ export default function RegionalMap({ onBack }) {
       </header>
 
       <main className="p-4 space-y-4 max-w-md mx-auto">
-        <Select
+        <SkuSelect
           label="สินค้า"
           value={selectedSku}
           onChange={setSelectedSku}

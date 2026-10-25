@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Select, Input } from '../components/FormFields'
+import { SkuSelect } from '../components/SkuSelect'
 import { SearchableSelect } from '../components/SearchableSelect'
 import { ConfirmDeleteButton } from '../components/ConfirmDeleteButton'
 
@@ -145,7 +146,7 @@ export default function MovementHistory({ onToast }) {
           <div key={row.id} className="bg-slate-800 rounded-lg border border-slate-700 p-3">
             {isEditing ? (
               <div className="space-y-2">
-                <Select
+                <SkuSelect
                   label="สินค้า"
                   value={draft.sku_id}
                   onChange={(v) => setDraft((d) => ({ ...d, sku_id: v }))}

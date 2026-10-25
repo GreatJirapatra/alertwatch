@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
 import { supabase } from '../lib/supabase'
 import { exportToCsv, todayStamp } from '../lib/csvExport'
-import { Select } from '../components/FormFields'
+import { SkuSelect } from '../components/SkuSelect'
 
 function tooltipStyle() {
   return {
@@ -483,7 +483,7 @@ export default function FinanceMonitoring({ onBack }) {
         ) : (
           <>
             <section className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-              <Select
+              <SkuSelect
                 label="ดูข้อมูลของ"
                 value={selectedSku}
                 onChange={setSelectedSku}
