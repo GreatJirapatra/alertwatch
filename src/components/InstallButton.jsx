@@ -45,7 +45,7 @@ function PwaDebug({ gotPrompt }) {
     }
   }, [gotPrompt])
   return (
-    <pre className="fixed inset-x-2 bottom-2 z-50 max-h-[60vh] overflow-auto p-3 rounded-lg bg-black/90 border border-teal-500 text-[10px] text-teal-200 whitespace-pre-wrap">
+    <pre className="fixed inset-0 z-[1000] overflow-auto p-4 bg-black text-xs text-teal-200 whitespace-pre-wrap break-all">
       {lines.join('\n')}
     </pre>
   )
